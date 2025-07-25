@@ -34,10 +34,10 @@
 </script>
 
 <div class="min-h-screen flex">
-  <!-- Left Side - Form -->
+  <!-- Left Side - Form (Now Full Screen) -->
   <div
     bind:this={leftSide}
-    class="w-full lg:w-1/2 flex items-center justify-center p-8 relative overflow-hidden"
+    class="w-full flex items-center justify-center p-8 relative overflow-hidden"
     style="background-color: #1C3752;"
   >
     <!-- Dark overlay with hole effect -->
@@ -143,7 +143,8 @@
     </div>
   </div>
 
-  <!-- Right Side - Logo Background -->
+  <!-- Right Side - Logo Background (Commented Out) -->
+  <!-- 
   <div
     class="hidden lg:flex lg:w-1/2 items-center justify-center"
     style="background-color: #F2E9DD;"
@@ -156,6 +157,7 @@
       />
     </div>
   </div>
+  -->
 </div>
 
 <style>
