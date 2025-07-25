@@ -62,7 +62,7 @@
                 id="username"
                 type="text"
                 bind:value={username}
-                class="w-full px-4 py-4 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-white placeholder-white/73"
+                class="w-full px-4 py-4 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-gray-800 placeholder-gray-500"
                 placeholder="Enter your username"
                 required
               />
@@ -78,7 +78,7 @@
                 id="password"
                 type="password"
                 bind:value={password}
-                class="w-full px-4 py-4 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-white placeholder-white/73"
+                class="w-full px-4 py-4 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-gray-800 placeholder-gray-500"
                 placeholder="Enter your password"
                 required
               />
