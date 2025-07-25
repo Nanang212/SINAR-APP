@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  username    String    @unique
+  password    String
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  created_by  Int?
+  updated_at  DateTime  @updatedAt
+  updated_by  Int?
+
+  role_id     Int
+  role        Role      @relation(fields: [role_id], references: [id])
+
+  category_id Int?
+  category    Kategori? @relation(fields: [category_id], references: [id])
+
+  documents           Document[]        @relation("UploadedDocuments")
+  documentReports     DocumentReport[]
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  created_by  Int?
+  updated_at  DateTime @updatedAt
+  updated_by  Int?
+
+  users       User[]
+}
+
+model Kategori {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  created_by  Int?
+  updated_at  DateTime @updatedAt
+  updated_by  Int?
+
+  users       User[]
+  documents   Document[]
+}
+
+model Document {
+  id             Int      @id @default(autoincrement())
+  filename       String
+  url            String
+  original_name  String
+  is_active      Boolean  @default(true)
+  is_downloaded  Boolean  @default(false)
+  uploaded_at    DateTime @default(now())
+  uploaded_by    Int
+  createdBy      String   @default("system")
+  updatedBy      String   @default("system")
+
+  category_id    Int
+  kategori       Kategori @relation(fields: [category_id], references: [id])
+  uploader       User     @relation("UploadedDocuments", fields: [uploaded_by], references: [id])
+
+  reports        DocumentReport[]
+}
+
+model DocumentReport {
+  id          Int       @id @default(autoincrement())
+  document_id Int
+  user_id     Int
+  type        String
+  content     String?     
+  description String?     
+  original_name String?
+  is_downloaded  Boolean   @default(false)
+  downloaded_at  DateTime?
+
+  created_at  DateTime   @default(now())
+  created_by  Int?
+  updated_at  DateTime   @updatedAt
+  updated_by  Int?
+
+  document    Document   @relation(fields: [document_id], references: [id])
+  user        User       @relation(fields: [user_id], references: [id])
+}
+
