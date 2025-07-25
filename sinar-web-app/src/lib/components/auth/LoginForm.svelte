@@ -12,29 +12,28 @@
 <div class="w-[80vw] h-[75vh]">
   <!-- Glassmorphism Card Container -->
   <div class="relative h-full">
-    <!-- 3D Shadow Effects -->
-    <div
-      class="absolute inset-0 bg-black/20 rounded-3xl transform translate-x-2 translate-y-2 blur-lg"
-    ></div>
-    <div
-      class="absolute inset-0 bg-black/10 rounded-3xl transform translate-x-1 translate-y-1 blur-md"
-    ></div>
 
-    <!-- Main Card with Enhanced Glassmorphism -->
+    <!-- Main Card with Realistic Glassmorphism -->
     <div
-      class="relative bg-white/5 backdrop-blur-xl border border-white/30 rounded-3xl shadow-2xl overflow-hidden h-full"
+      class="relative bg-white/8 backdrop-blur-xl border border-white/40 rounded-3xl overflow-hidden h-full"
       style="box-shadow: 
-           inset 0 1px 0 0 rgba(255,255,255,0.2), 
-           inset 0 -1px 0 0 rgba(255,255,255,0.1),
-           0 20px 40px rgba(0,0,0,0.3),
-           0 8px 16px rgba(0,0,0,0.2);"
+           inset 0 1px 0 0 rgba(255,255,255,0.4), 
+           inset 0 -1px 0 0 rgba(255,255,255,0.2),
+           inset -1px 0 0 0 rgba(255,255,255,0.1),
+           inset 1px 0 0 0 rgba(255,255,255,0.1);"
     >
-      <!-- Glass Shine Effect -->
+      <!-- Enhanced Glass Shine Effects -->
       <div
-        class="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent rounded-t-3xl"
+        class="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/15 to-transparent rounded-t-3xl"
       ></div>
       <div
-        class="absolute top-4 left-4 w-20 h-20 bg-white/5 rounded-full blur-xl"
+        class="absolute top-4 left-4 w-20 h-20 bg-white/10 rounded-full blur-3xl"
+      ></div>
+      <div
+        class="absolute top-1/3 right-8 w-12 h-12 bg-white/6 rounded-full blur-2xl"
+      ></div>
+      <div
+        class="absolute bottom-1/4 left-1/3 w-8 h-8 bg-white/4 rounded-full blur-xl"
       ></div>
 
       <!-- Split Content: 60% Logo, 40% Login Form -->
