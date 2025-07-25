@@ -13,27 +13,21 @@
   <!-- Glassmorphism Card Container -->
   <div class="relative h-full">
 
-    <!-- Main Card with Realistic Glassmorphism -->
+    <!-- Main Card with Optimal Glassmorphism -->
     <div
-      class="relative bg-white/8 backdrop-blur-xl border border-white/40 rounded-3xl overflow-hidden h-full"
+      class="relative bg-white/5 backdrop-blur-xl border border-white/30 rounded-3xl px-16 py-12 overflow-hidden h-full"
       style="box-shadow: 
-           inset 0 1px 0 0 rgba(255,255,255,0.4), 
-           inset 0 -1px 0 0 rgba(255,255,255,0.2),
-           inset -1px 0 0 0 rgba(255,255,255,0.1),
-           inset 1px 0 0 0 rgba(255,255,255,0.1);"
+           inset 0 1px 0 0 rgba(255,255,255,0.2), 
+           inset 0 -1px 0 0 rgba(255,255,255,0.1),
+           0 20px 40px rgba(0,0,0,0.3),
+           0 8px 16px rgba(0,0,0,0.2);"
     >
-      <!-- Enhanced Glass Shine Effects -->
+      <!-- Optimal Glass Shine Effects -->
       <div
-        class="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/15 to-transparent rounded-t-3xl"
+        class="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent rounded-t-3xl"
       ></div>
       <div
-        class="absolute top-4 left-4 w-20 h-20 bg-white/10 rounded-full blur-3xl"
-      ></div>
-      <div
-        class="absolute top-1/3 right-8 w-12 h-12 bg-white/6 rounded-full blur-2xl"
-      ></div>
-      <div
-        class="absolute bottom-1/4 left-1/3 w-8 h-8 bg-white/4 rounded-full blur-xl"
+        class="absolute top-4 left-4 w-20 h-20 bg-white/5 rounded-full blur-xl"
       ></div>
 
       <!-- Split Content: 60% Logo, 40% Login Form -->
@@ -50,25 +44,25 @@
         </div>
 
         <!-- Login Form Section (40%) -->
-        <div class="flex-[4] min-w-80 bg-white rounded-r-3xl p-8 shadow-lg h-full flex flex-col justify-center">
+        <div class="flex-[4] min-w-80 p-8 h-full flex flex-col justify-center">
           <!-- Header Inside Glass Card -->
           <div class="mb-8">
-            <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3 tracking-tight">Welcome back</h1>
-            <p class="text-slate-500 font-medium text-base">Login to your account</p>
+            <h1 class="text-3xl font-bold text-white mb-3 tracking-tight drop-shadow-sm">Welcome back</h1>
+            <p class="text-white/80 font-medium text-base drop-shadow-sm">Login to your account</p>
           </div>
 
           <!-- Login Form -->
           <form onsubmit={handleSubmit} class="space-y-8">
             <!-- Username Field -->
             <div>
-              <label for="username" class="block text-sm font-medium text-gray-700 mb-2"
+              <label for="username" class="block text-sm font-medium text-white/90 mb-2 drop-shadow-sm"
                 >Username</label
               >
               <input
                 id="username"
                 type="text"
                 bind:value={username}
-                class="w-full px-4 py-4 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                class="w-full px-4 py-4 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-white placeholder-white/73"
                 placeholder="Enter your username"
                 required
               />
@@ -78,13 +72,13 @@
             <div>
               <label
                 for="password"
-                class="block text-sm font-medium text-gray-700 mb-2">Password</label
+                class="block text-sm font-medium text-white/90 mb-2 drop-shadow-sm">Password</label
               >
               <input
                 id="password"
                 type="password"
                 bind:value={password}
-                class="w-full px-4 py-4 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                class="w-full px-4 py-4 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-white placeholder-white/73"
                 placeholder="Enter your password"
                 required
               />
