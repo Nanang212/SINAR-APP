@@ -1,5 +1,15 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { AuthGuard } from '@/lib/utils/';
   import MainLayout from '@/lib/components/layout/MainLayout.svelte';
+
+  onMount(() => {
+    // Check if user is authenticated and redirect to home
+    AuthGuard.checkAccess({
+      redirectIfAuth: true,
+      redirectTo: '/home'
+    });
+  });
 </script>
 
 <svelte:head>
