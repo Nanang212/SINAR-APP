@@ -1,12 +1,14 @@
 <script lang="ts">
   import { loginHandler } from './loginHandler';
   import { NavigationHelper } from '$lib/utils/navigation';
+  import { Loading } from '$lib';
   import { onMount } from 'svelte';
   
   let username = $state("");
   let password = $state("");
   let isLoading = $state(false);
   let errorMessage = $state("");
+  let showPageOverlay = $state(false);
 
   onMount(() => {
     // Subscribe to login handler state changes
@@ -29,6 +31,15 @@
     });
 
     if (success) {
+      // Show page overlay loading
+      showPageOverlay = true;
+      
+      // Minimum delay for smooth transition (500ms)
+      const minDelay = new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Wait for minimum delay before redirect
+      await minDelay;
+      
       // Redirect to home page after successful login
       NavigationHelper.goHome();
     }
@@ -185,6 +196,11 @@
     </div>
   </div>
 </div>
+
+<!-- Page overlay loading after successful login -->
+{#if showPageOverlay}
+  <Loading overlay={true} text="Redirecting to home..." />
+{/if}
 
 <style>
   @keyframes sunShine {

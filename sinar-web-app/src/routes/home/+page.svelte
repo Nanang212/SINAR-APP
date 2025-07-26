@@ -1,16 +1,23 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { AuthGuard } from '$lib/utils';
+  import { LoadingAuthGuard } from '$lib/utils';
   import { authService } from '$lib/services';
   import { NavigationHelper } from '$lib/utils';
+  import { Loading } from '$lib';
   
   let currentTime = $state("");
   let userName = $state("Admin"); // This would come from auth state in real app
   let isLoggingOut = $state(false);
+  let showLogoutOverlay = $state(false);
+  let showRedirectLoading = $state(false);
   
-  onMount(() => {
-    // Guard home page - redirect to login if not authenticated
-    if (!AuthGuard.guardHomePage()) {
+  onMount(async () => {
+    // Guard home page with loading - redirect to login if not authenticated
+    const hasAccess = await LoadingAuthGuard.guardHomePage((loading) => {
+      showRedirectLoading = loading;
+    });
+    
+    if (!hasAccess) {
       return; // Exit if redirected
     }
 
@@ -41,8 +48,18 @@
     
     isLoggingOut = true;
     
+    // Show page overlay loading immediately
+    showLogoutOverlay = true;
+    
     try {
+      // First, show loading for user experience (2 seconds)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Then call logout API
       const response = await authService.logout();
+      
+      // Additional delay after API call (500ms)
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       if (response.status) {
         // Redirect to login page after successful logout
@@ -54,10 +71,12 @@
       }
     } catch (error) {
       console.error('Logout error:', error);
-      // Still redirect even if there was an error (local cleanup already done)
+      // Still wait for full delay even on error
+      await new Promise(resolve => setTimeout(resolve, 500));
       NavigationHelper.navigateTo('/login');
     } finally {
       isLoggingOut = false;
+      showLogoutOverlay = false;
     }
   }
 </script>
@@ -267,3 +286,13 @@
     </div>
   </main>
 </div>
+
+<!-- Logout overlay loading -->
+{#if showLogoutOverlay}
+  <Loading overlay={true} text="Logging out..." />
+{/if}
+
+<!-- Redirect loading overlay -->
+{#if showRedirectLoading}
+  <Loading overlay={true} text="Redirecting to login..." />
+{/if}

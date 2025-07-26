@@ -2,6 +2,7 @@
 export { NavigationHelper } from './navigation';
 export { TokenHelper } from './tokenHelper';
 export { AuthGuard } from './authGuard';
+export { LoadingAuthGuard } from './loadingAuthGuard';
 export { cn } from './cn';
 
 // You can add more utilities here as needed

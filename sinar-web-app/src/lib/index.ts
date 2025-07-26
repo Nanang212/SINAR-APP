@@ -3,6 +3,7 @@ export { default as Button } from "@/lib/components/ui/button.svelte";
 export { default as Input } from "@/lib/components/ui/input.svelte";
 export { default as Card } from "@/lib/components/ui/card.svelte";
 export { default as Label } from "@/lib/components/ui/label.svelte";
+export { default as Loading } from "@/lib/components/ui/loading.svelte";
 
 // Layout components
 export { default as MainLayout } from "@/lib/components/layout/MainLayout.svelte";

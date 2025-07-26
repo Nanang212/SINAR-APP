@@ -1,12 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { AuthGuard } from '$lib/utils';
+  import { LoadingAuthGuard } from '$lib/utils';
+  import { Loading } from '$lib';
   import AuthLayout from '@/lib/components/layout/AuthLayout.svelte';
   import LoginForm from '@/lib/components/auth/LoginForm.svelte';
 
-  onMount(() => {
-    // Guard login page - redirect to home if already authenticated
-    AuthGuard.guardLoginPage();
+  let showRedirectLoading = $state(false);
+
+  onMount(async () => {
+    // Guard login page with loading - redirect to home if already authenticated
+    await LoadingAuthGuard.guardLoginPage((loading) => {
+      showRedirectLoading = loading;
+    });
   });
 </script>
 
@@ -19,3 +24,8 @@
     <LoginForm />
   {/snippet}
 </AuthLayout>
+
+<!-- Redirect loading overlay -->
+{#if showRedirectLoading}
+  <Loading overlay={true} text="Redirecting..." />
+{/if}
