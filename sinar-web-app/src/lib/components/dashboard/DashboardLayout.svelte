@@ -15,11 +15,13 @@
   <DashboardSidebar />
   
   <!-- Main Content Area -->
-  <div class="flex-1 flex flex-col min-w-0">
-    <!-- Header -->
-    <DashboardHeader />
+  <div class="flex-1 flex flex-col min-w-0 h-screen">
+    <!-- Header - Fixed/Sticky -->
+    <div class="sticky top-0 z-30">
+      <DashboardHeader />
+    </div>
     
-    <!-- Page Content -->
+    <!-- Page Content - Scrollable -->
     <main class="flex-1 overflow-auto">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {@render children()}
