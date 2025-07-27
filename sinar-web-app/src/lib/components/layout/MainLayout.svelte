@@ -1,6 +1,7 @@
 <script lang="ts">
   import Header from './Header.svelte';
   import Footer from './Footer.svelte';
+  import { ToastContainer } from '$lib';
   import type { Snippet } from "svelte";
 
   interface $$Props {
@@ -19,3 +20,5 @@
   
   <Footer />
 </div>
+
+<ToastContainer />

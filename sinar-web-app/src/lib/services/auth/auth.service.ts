@@ -23,6 +23,24 @@ export interface UserProfile {
   category: any;
 }
 
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+}
+
+export interface ChangePasswordResponse {
+  id: number;
+  username: string;
+  password: string;
+  is_active: boolean;
+  created_at: string;
+  created_by: number;
+  updated_at: string;
+  updated_by: number | null;
+  role_id: number;
+  category_id: number | null;
+}
+
 class AuthService {
   // Login user
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
@@ -122,6 +140,98 @@ class AuthService {
       return userData ? JSON.parse(userData) : null;
     } catch (error) {
       return null;
+    }
+  }
+
+  // Get user by ID from backend
+  async getUserById(userId: number): Promise<ApiResponse<UserProfile>> {
+    try {
+      const response = await httpClient.authenticatedRequest<{
+        id: number;
+        username: string;
+        is_active: boolean;
+        created_at: string;
+        created_by: number;
+        updated_at: string;
+        updated_by: number | null;
+        role_id: number;
+        category_id: number | null;
+        role: {
+          id: number;
+          name: string;
+          is_active: boolean;
+          created_at: string;
+          created_by: number;
+          updated_at: string;
+          updated_by: number | null;
+        };
+        category: any;
+      }[]>(`/api/v1/users/${userId}`, {
+        method: 'GET'
+      });
+
+      if (response.status && response.data && response.data.length > 0) {
+        const userData = response.data[0];
+        if (!userData) {
+          return {
+            status: false,
+            code: 404,
+            message: "User not found",
+            error: "User not found"
+          };
+        }
+
+        // Transform to UserProfile format
+        const userProfile: UserProfile = {
+          id: userData.id,
+          username: userData.username,
+          role: userData.role.name,
+          category: userData.category
+        };
+
+        return {
+          status: true,
+          code: 200,
+          message: response.message || "Success getting user by id",
+          data: userProfile
+        };
+      }
+
+      return {
+        status: false,
+        code: 404,
+        message: "User not found",
+        error: "User not found"
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 500,
+        message: "Failed to get user data",
+        error: "Failed to get user data"
+      };
+    }
+  }
+
+  // Change password
+  async changePassword(request: ChangePasswordRequest): Promise<ApiResponse<ChangePasswordResponse>> {
+    try {
+      const response = await httpClient.authenticatedRequest<ChangePasswordResponse>(
+        "/api/v1/users/change-password",
+        {
+          method: 'PUT',
+          body: request
+        }
+      );
+
+      return response;
+    } catch (error) {
+      return {
+        status: false,
+        code: 500,
+        message: "Failed to change password. Please try again.",
+        error: "Failed to change password. Please try again."
+      };
     }
   }
 
