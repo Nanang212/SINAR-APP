@@ -55,14 +55,16 @@ model Kategori {
   updated_by  Int?
 
   users       User[]
-  documents   Document[]
+  documents   Document[] @relation("DocumentKategori")
 }
 
 model Document {
   id             Int      @id @default(autoincrement())
   filename       String
-  url            String
+  title          String?
+  url            String?
   original_name  String
+  remark         String?
   is_active      Boolean  @default(true)
   is_downloaded  Boolean  @default(false)
   uploaded_at    DateTime @default(now())
@@ -70,8 +72,7 @@ model Document {
   createdBy      String   @default("system")
   updatedBy      String   @default("system")
 
-  category_id    Int
-  kategori       Kategori @relation(fields: [category_id], references: [id])
+  kategori       Kategori[]  @relation("DocumentKategori")
   uploader       User     @relation("UploadedDocuments", fields: [uploaded_by], references: [id])
 
   reports        DocumentReport[]

@@ -9,24 +9,29 @@ exports.findAllDocuments = async (params) => {
       ...params,
       where: {
         is_active: true,
-        ...params.where,
+        ...params?.where,
       },
     },
     customSelect: {
       id: true,
+      title: true,
       filename: true,
       original_name: true,
       url: true,
-      category_id: true,
-      uploaded_by: true,
       uploaded_at: true,
+      is_downloaded: true,
+      remark: true,
       createdBy: true,
       updatedBy: true,
-      is_active: true,
-      is_downloaded: true, 
       uploader: {
         select: {
           username: true,
+        },
+      },
+      kategori: {
+        select: {
+          id: true,
+          name: true,
         },
       },
     },
@@ -41,19 +46,24 @@ exports.findDocumentById = async (id) => {
     },
     select: {
       id: true,
+      title: true,
       filename: true,
       original_name: true,
       url: true,
-      category_id: true,
-      uploaded_by: true,
       uploaded_at: true,
+      is_downloaded: true,
+      remark: true,
       createdBy: true,
       updatedBy: true,
-      is_active: true,
-      is_downloaded: true, 
       uploader: {
         select: {
           username: true,
+        },
+      },
+      kategori: {
+        select: {
+          id: true,
+          name: true,
         },
       },
     },
@@ -62,12 +72,25 @@ exports.findDocumentById = async (id) => {
 
 exports.createDocument = async ({ data, createdBy }) => {
   try {
+    const { kategoriIds, ...rest } = data;
+
     const newDoc = await prisma.document.create({
       data: {
-        ...data,
+        ...rest,
         is_active: true,
         createdBy: createdBy || "system",
         updatedBy: createdBy || "system",
+        kategori: {
+          connect: kategoriIds?.map((id) => ({ id })),
+        },
+      },
+      include: {
+        kategori: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -96,11 +119,26 @@ exports.updateDocument = async (id, data, updatedBy) => {
       };
     }
 
+    const { kategoriIds, ...rest } = data;
+
     const updated = await prisma.document.update({
       where: { id },
       data: {
-        ...data,
+        ...rest,
         updatedBy: updatedBy || "system",
+        ...(kategoriIds && {
+          kategori: {
+            set: kategoriIds.map((id) => ({ id })),
+          },
+        }),
+      },
+      include: {
+        kategori: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 

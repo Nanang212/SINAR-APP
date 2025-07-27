@@ -12,33 +12,36 @@ const { baseUrl } = require("../../config/dotenv");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-// 🔍 Get all documents (filtered by user category if not admin)
 exports.getAllDocuments = async (req, res) => {
   try {
-    const filters =
-      req.user.role !== "admin" ? { category_id: req.user.category_id } : {};
-
-    const data = await documentService.getAllDocuments({
-      ...req.query,
-      where: filters,
-    });
+    const data = await documentService.getAllDocuments(req.query);
 
     if (!data || data.length === 0) {
       return notFound(res, "No documents found");
     }
 
-    const formattedData = data.map((doc) => ({
+    const filtered =
+      req.user.role === "admin"
+        ? data
+        : data.filter((doc) =>
+            doc.kategori.some((kat) => kat.id === req.user.category_id)
+          );
+
+    const formattedData = filtered.map((doc) => ({
       id: doc.id,
+      title: doc.title,
+      remark: doc.remark,
       filename: doc.filename,
       original_name: doc.original_name,
       url: `${baseUrl}/api/v1/documents/download/${doc.id}`,
-      category_id: doc.category_id,
+      is_downloaded: doc.is_downloaded,
       uploaded_by: doc.uploaded_by,
       uploaded_at: doc.uploaded_at,
       createdBy: doc.createdBy,
       updatedBy: doc.updatedBy,
       is_active: doc.is_active,
       username_upload: doc.uploader?.username,
+      categories: doc.kategori.map((c) => ({ id: c.id, name: c.name })),
     }));
 
     return successList(res, "Success getting all documents", formattedData);
@@ -48,7 +51,6 @@ exports.getAllDocuments = async (req, res) => {
   }
 };
 
-// 🔍 Get single document by ID
 exports.getDocumentById = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -60,16 +62,19 @@ exports.getDocumentById = async (req, res) => {
 
     const formatted = {
       id: doc.id,
+      title: doc.title,
+      remark: doc.remark,
       filename: doc.filename,
       original_name: doc.original_name,
       url: `${baseUrl}/api/v1/documents/download/${doc.id}`,
-      category_id: doc.category_id,
-      uploaded_by: doc.uploaded_by,
+      is_downloaded: doc.is_downloaded,
+      uploaded_by: doc.uploader,
       uploaded_at: doc.uploaded_at,
       createdBy: doc.createdBy,
       updatedBy: doc.updatedBy,
       is_active: doc.is_active,
       username_upload: doc.uploader?.username,
+      categories: doc.kategori.map((c) => ({ id: c.id, name: c.name })),
     };
 
     return successList(res, "Success getting document by id", [formatted]);
@@ -79,33 +84,43 @@ exports.getDocumentById = async (req, res) => {
   }
 };
 
-// ⬆️ Upload document (admin only)
 exports.uploadDocument = async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
-      return errorStatus(res, 403, "Only admin can upload documents");
+    const file = req.file;
+    if (!file) {
+      return errorStatus(res, "No file uploaded", 400);
     }
 
-    const file = req.file;
-    const { category_id } = req.body;
+    const { title, category_ids, remark } = req.body;
+    if (!category_ids) {
+      return errorStatus(res, "Category IDs are required", 400);
+    }
 
-    if (!file) return errorStatus(res, 400, "File is required");
-    if (file.size > MAX_FILE_SIZE)
-      return errorStatus(res, 400, "File size exceeds the limit of 10MB");
-    if (!category_id) return errorStatus(res, 400, "Category ID is required");
+    const categoryIdArray = Array.isArray(category_ids)
+      ? category_ids.map((id) => parseInt(id))
+      : String(category_ids)
+          .split(",")
+          .map((id) => parseInt(id.trim()));
+
+    if (categoryIdArray.some(isNaN)) {
+      return errorStatus(res, "Invalid category ID format", 400);
+    }
 
     const result = await documentService.createDocument({
       data: {
         filename: req.minioFilename,
         original_name: file.originalname,
-        category_id: parseInt(category_id),
+        title: title || null,
+        remark: remark || null,
         uploaded_by: req.user.id,
+        kategoriIds: categoryIdArray,
+        url: null,
       },
       createdBy: req.user.name || "system",
     });
 
     if (!result.success) {
-      return errorStatus(res, 500, result.msg);
+      return errorStatus(res, result.msg || "Failed to create document", 500);
     }
 
     const docId = result.data.id;
@@ -116,27 +131,32 @@ exports.uploadDocument = async (req, res) => {
       url: downloadUrl,
     });
   } catch (err) {
-    console.error("UploadDocument Error:", err);
-    return errorStatus(res, 500, "Failed to upload document");
+    console.error("uploadDocument error:", err);
+    return errorStatus(res, "Internal server error", 500);
   }
 };
 
-// ✏️ Update document (optional file or category change)
 exports.updateDocument = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const file = req.file;
-    const { category_id } = req.body;
+    const { category_ids, title, remark } = req.body;
 
     if (file && file.size > MAX_FILE_SIZE) {
       return errorStatus(res, 400, "File size exceeds the limit of 10MB");
     }
 
     const data = {
-      ...(category_id && { category_id: parseInt(category_id) }),
+      ...(title && { title }),
+      ...(remark && { remark }),
       ...(file && {
         filename: req.minioFilename,
         original_name: file.originalname,
+      }),
+      ...(category_ids && {
+        kategori: {
+          set: JSON.parse(category_ids).map((id) => ({ id })),
+        },
       }),
     };
 
@@ -158,7 +178,6 @@ exports.updateDocument = async (req, res) => {
   }
 };
 
-// ❌ Delete document (soft delete)
 exports.deleteDocument = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -180,7 +199,6 @@ exports.deleteDocument = async (req, res) => {
   }
 };
 
-// 📥 Download document (with role + category validation in service)
 exports.downloadDocument = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -193,7 +211,6 @@ exports.downloadDocument = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/octet-stream");
 
-    // ✅ Kirim stream file
     stream.pipe(res);
   } catch (err) {
     console.error("DownloadDocument Error:", err);
