@@ -1,12 +1,11 @@
 version: "3.8"
 
 services:
-  # PostgreSQL service
   postgres:
     image: postgres:17
     container_name: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432" # ✅ ubah port host supaya bisa bedakan dengan lokal (5433 di host, 5432 di container)
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
@@ -16,7 +15,6 @@ services:
     networks:
       - app-network
 
-  # MinIO service
   minio:
     image: quay.io/minio/minio
     container_name: minio
@@ -32,7 +30,6 @@ services:
     networks:
       - app-network
 
-  # Node.js backend service
   backend:
     build:
       context: .
