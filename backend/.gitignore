@@ -3,3 +3,19 @@ node_modules
 .env
 
 /src/generated/prisma
+
+
+# Ignore PostgreSQL data
+pgdata/
+pgdata/*
+
+# Ignore MinIO internal files
+minio-data/
+minio-data/*
+
+# Optional: ignore hidden system folders
+minio.sys/
+minio.sys/*
+
+# Jangan track file *.pid
+*.pid
