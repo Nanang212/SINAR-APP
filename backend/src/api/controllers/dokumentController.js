@@ -146,6 +146,12 @@ exports.updateDocument = async (req, res) => {
       return errorStatus(res, 400, "File size exceeds the limit of 10MB");
     }
 
+    const categoryIdArray = Array.isArray(category_ids)
+      ? category_ids.map((id) => parseInt(id))
+      : String(category_ids)
+          .split(",")
+          .map((id) => parseInt(id.trim()));
+
     const data = {
       ...(title && { title }),
       ...(remark && { remark }),
@@ -153,11 +159,7 @@ exports.updateDocument = async (req, res) => {
         filename: req.minioFilename,
         original_name: file.originalname,
       }),
-      ...(category_ids && {
-        kategori: {
-          set: JSON.parse(category_ids).map((id) => ({ id })),
-        },
-      }),
+      kategoriIds: categoryIdArray,
     };
 
     const result = await documentService.updateDocument(

@@ -20,6 +20,7 @@ exports.findAllDocuments = async (params) => {
       url: true,
       uploaded_at: true,
       is_downloaded: true,
+      is_active: true,
       remark: true,
       createdBy: true,
       updatedBy: true,

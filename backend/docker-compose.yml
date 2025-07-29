@@ -3,62 +3,67 @@ version: "3.8"
 services:
   postgres:
     image: postgres:17
-    container_name: postgres
+    container_name: sinar_postgres
+    restart: always
     ports:
-      - "5433:5432" # ✅ ubah port host supaya bisa bedakan dengan lokal (5433 di host, 5432 di container)
+      - "5433:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: mentri
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
-      - app-network
+      - sinar_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: quay.io/minio/minio
-    container_name: minio
+    container_name: sinar_minio
+    restart: always
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - ./minio-data:/data
+      - minio_data:/data
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     command: server /data --console-address ":9001"
     networks:
-      - app-network
+      - sinar_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: express-app
+    container_name: sinar_backend
+    restart: always
     ports:
       - "3000:3000"
     depends_on:
-      - postgres
-      - minio
-    environment:
-      NODE_ENV: development
-      PORT: 3000
-      DATABASE_URL: "postgresql://postgres:admin@postgres:5432/mentri?schema=public"
-      JWT_SECRET: eyJhbGciOiJIUzI1NiJ9
-      JWT_EXPIRES_IN: 1d
-      MINIO_ENDPOINT: minio
-      MINIO_PORT: 9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_DOCUMENT_BUCKET: document
-      MINIO_REPORT_BUCKET: report
-      MINIO_USE_SSL: false
-      APP_BASE_URL_DEV: http://localhost:3000
-    volumes:
-      - .:/app
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
     networks:
-      - app-network
+      - sinar_network
 
 networks:
-  app-network:
+  sinar_network:
     driver: bridge
+
+volumes:
+  postgres_data:
+  minio_data:

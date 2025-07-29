@@ -25,20 +25,26 @@ exports.deleteDocument = async (id, updatedBy) => {
 exports.downloadDocument = async ({ id, user }) => {
   const doc = await documentRepository.findDocumentById(id);
 
-  if (!doc || !doc.is_active) {
+  if (!doc) {
     throw { code: 404, message: "Document not found or inactive" };
   }
 
-  if (user.role !== "admin" && doc.category_id !== user.category_id) {
+  const isAdmin = user.role?.toLowerCase() === "admin";
+  const allowed = doc.kategori?.some((cat) => cat.id === user.category_id);
+
+  if (!isAdmin && !allowed) {
     throw { code: 403, message: "Forbidden: You can't access this document" };
   }
-
   try {
     const fileStream = await new Promise((resolve, reject) => {
-      minioClient.getObject(minio.bucketDocument, doc.filename, (err, stream) => {
-        if (err) return reject(err);
-        resolve(stream);
-      });
+      minioClient.getObject(
+        minio.bucketDocument,
+        doc.filename,
+        (err, stream) => {
+          if (err) return reject(err);
+          resolve(stream);
+        }
+      );
     });
 
     if (!doc.is_downloaded) {
