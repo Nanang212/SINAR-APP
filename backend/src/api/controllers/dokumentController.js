@@ -158,6 +158,7 @@ exports.updateDocument = async (req, res) => {
       ...(file && {
         filename: req.minioFilename,
         original_name: file.originalname,
+        is_downloaded: false,
       }),
       kategoriIds: categoryIdArray,
     };
