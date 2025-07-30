@@ -2,6 +2,7 @@
   import DashboardHeader from './DashboardHeader.svelte';
   import DashboardSidebar from './DashboardSidebar.svelte';
   import { ToastContainer } from '$lib';
+  import ModalToastContainer from '$lib/components/ui/modal-toast-container.svelte';
 
   interface Props {
     children: import('svelte').Snippet;
@@ -17,13 +18,13 @@
   <!-- Main Content Area -->
   <div class="flex-1 flex flex-col min-w-0 h-screen">
     <!-- Header - Fixed/Sticky -->
-    <div class="sticky top-0 z-30">
+    <div class="sticky top-0 z-[100]">
       <DashboardHeader />
     </div>
     
     <!-- Page Content - Scrollable -->
     <main class="flex-1 overflow-auto">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="w-[92%] mx-auto px-4 py-8 mt-4">
         {@render children()}
       </div>
     </main>
@@ -31,3 +32,4 @@
 </div>
 
 <ToastContainer />
+<ModalToastContainer />

@@ -52,8 +52,19 @@ class HttpClient {
         method,
         headers: defaultHeaders,
         signal: controller.signal,
-        ...(body && { body: JSON.stringify(body) }),
       };
+
+      // Handle different body types
+      if (body) {
+        if (body instanceof FormData) {
+          // For FormData, don't set Content-Type header (browser will set it with boundary)
+          delete requestConfig.headers['Content-Type'];
+          requestConfig.body = body;
+        } else {
+          // For other body types, stringify as JSON
+          requestConfig.body = JSON.stringify(body);
+        }
+      }
 
       const response = await fetch(url, requestConfig);
       clearTimeout(timeoutId);

@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { authService, type ChangePasswordRequest } from "$lib/services";
   import { NavigationHelper } from "$lib/utils";
-  import { Loading, toastStore } from "$lib";
+  import { Loading, toastStore, ConfirmationModal } from "$lib";
+  import { modalToastStore } from "$lib/stores/modal-toast";
 
   let currentTime = $state("");
   let userName = $state("Admin");
@@ -11,6 +12,7 @@
   let showLogoutOverlay = $state(false);
   let showProfileDropdown = $state(false);
   let showChangePasswordModal = $state(false);
+  let showChangePasswordConfirmation = $state(false);
   let isChangingPassword = $state(false);
 
   // Change password form data
@@ -86,7 +88,7 @@
     };
   }
 
-  async function handleChangePassword(event: Event) {
+  async function handleChangePasswordSubmit(event: Event) {
     event.preventDefault();
     if (isChangingPassword) return;
 
@@ -96,22 +98,28 @@
       !changePasswordForm.new_password ||
       !changePasswordForm.confirm_password
     ) {
-      toastStore.error("All fields are required");
+      modalToastStore.error("All fields are required");
       return;
     }
 
     if (
       changePasswordForm.new_password !== changePasswordForm.confirm_password
     ) {
-      toastStore.error("New passwords do not match");
+      modalToastStore.error("New passwords do not match");
       return;
     }
 
     if (changePasswordForm.new_password.length < 6) {
-      toastStore.error("New password must be at least 6 characters");
+      modalToastStore.error("New password must be at least 6 characters");
       return;
     }
 
+    // Show confirmation modal
+    showChangePasswordConfirmation = true;
+  }
+
+  async function handleChangePassword() {
+    showChangePasswordConfirmation = false;
     isChangingPassword = true;
     
     // Show loading toast
@@ -132,20 +140,32 @@
       toastStore.remove(loadingToastId);
 
       if (response.status) {
-        toastStore.success("Password changed successfully!");
+        modalToastStore.success("Password changed successfully! You will be logged out in 3 seconds.");
         closeChangePasswordModal();
+        
+        // Auto logout after password change
+        setTimeout(async () => {
+          try {
+            const logoutResponse = await authService.logout();
+            NavigationHelper.navigateTo("/login");
+          } catch (error) {
+            console.error("Auto logout error:", error);
+            // Force navigation even if logout fails
+            NavigationHelper.navigateTo("/login");
+          }
+        }, 3000); // 3 seconds delay to let user read the success message
       } else {
         // Handle specific error messages
         if (response.message?.includes("incorrect") || response.message?.includes("wrong")) {
-          toastStore.error("Current password is incorrect");
+          modalToastStore.error("Current password is incorrect");
         } else {
-          toastStore.error(response.message || "Failed to change password");
+          modalToastStore.error(response.message || "Failed to change password");
         }
       }
     } catch (error) {
       // Remove loading toast
       toastStore.remove(loadingToastId);
-      toastStore.error("Failed to change password. Please try again.");
+      modalToastStore.error("Failed to change password. Please try again.");
     } finally {
       isChangingPassword = false;
     }
@@ -190,7 +210,7 @@
 </script>
 
 <header
-  class="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 shadow-sm"
+  class="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 shadow-sm relative z-[100]"
 >
   <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between items-center py-4">
@@ -218,7 +238,7 @@
           <!-- Dropdown Menu -->
           {#if showProfileDropdown}
             <div
-              class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50"
+              class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-[99999]"
             >
               <div class="py-1">
                 <!-- Profile Info -->
@@ -325,7 +345,7 @@
         </button>
       </div>
 
-      <form onsubmit={handleChangePassword}>
+      <form onsubmit={handleChangePasswordSubmit}>
         <div class="space-y-4">
           <!-- Old Password -->
           <div>
@@ -404,6 +424,21 @@
     </div>
   </div>
 {/if}
+
+<!-- Change Password Confirmation Modal -->
+<ConfirmationModal
+  isOpen={showChangePasswordConfirmation}
+  title="Change Password Confirmation"
+  message="Are you sure you want to change your password? You will be automatically logged out after the password is changed for security reasons."
+  confirmText="Change Password"
+  cancelText="Cancel"
+  confirmButtonClass="bg-blue-600 hover:bg-blue-700 text-white"
+  isLoading={isChangingPassword}
+  onConfirm={handleChangePassword}
+  onCancel={() => {
+    showChangePasswordConfirmation = false;
+  }}
+/>
 
 <!-- Logout loading overlay -->
 {#if showLogoutOverlay}

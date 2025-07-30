@@ -6,6 +6,7 @@ export { default as Label } from "@/lib/components/ui/label.svelte";
 export { default as Loading } from "@/lib/components/ui/loading.svelte";
 export { default as Toast } from "@/lib/components/ui/toast.svelte";
 export { default as ToastContainer } from "@/lib/components/ui/toast-container.svelte";
+export { default as ConfirmationModal } from "@/lib/components/ui/ConfirmationModal.svelte";
 
 // Layout components
 export { default as MainLayout } from "@/lib/components/layout/MainLayout.svelte";
