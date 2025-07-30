@@ -14,18 +14,15 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 exports.getAllDocuments = async (req, res) => {
   try {
-    const data = await documentService.getAllDocuments(req.query);
+    const result = await documentService.getAllDocuments(req.query);
 
-    if (!data || data.length === 0) {
-      return notFound(res, "No documents found");
+    let filtered = result.data;
+
+    if (req.user.role !== "admin") {
+      filtered = filtered.filter((doc) =>
+        doc.kategori.some((kat) => kat.id === req.user.category_id)
+      );
     }
-
-    const filtered =
-      req.user.role === "admin"
-        ? data
-        : data.filter((doc) =>
-            doc.kategori.some((kat) => kat.id === req.user.category_id)
-          );
 
     const formattedData = filtered.map((doc) => ({
       id: doc.id,
@@ -44,7 +41,12 @@ exports.getAllDocuments = async (req, res) => {
       categories: doc.kategori.map((c) => ({ id: c.id, name: c.name })),
     }));
 
-    return successList(res, "Success getting all documents", formattedData);
+    return successList(res, "Success getting all documents", {
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      data: formattedData,
+    });
   } catch (err) {
     console.error("GetAllDocuments Error:", err);
     return errorStatus(res, 500, "Failed to get documents");

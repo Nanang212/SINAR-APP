@@ -1,13 +1,27 @@
 // ======= SUCCESS RESPONSES =======
 
 exports.successList = (res, message, data = []) => {
-  res.status(200).json({
-    status: true,
-    code: 200,
-    message,
-    total: Array.isArray(data) ? data.length : 0,
-    data,
-  });
+  if (Array.isArray(data)) {
+    // Format lama: hanya array
+    res.status(200).json({
+      status: true,
+      code: 200,
+      message,
+      total: data.length,
+      data,
+    });
+  } else {
+    // Format baru: object { total, page, limit, data }
+    res.status(200).json({
+      status: true,
+      code: 200,
+      message,
+      total: data.total || 0,
+      page: data.page || 1,
+      // limit: data.limit || 0,
+      data: data.data || [],
+    });
+  }
 };
 
 exports.successCreate = (res, message, data) => {

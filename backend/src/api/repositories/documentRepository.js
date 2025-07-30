@@ -2,6 +2,7 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { findAllBuilder } = require("../utils/query");
 const { deleteFile } = require("../utils/minioHelper");
+const { baseUrl } = require("../../config/dotenv");
 
 exports.findAllDocuments = async (params) => {
   return await findAllBuilder({
@@ -76,6 +77,7 @@ exports.createDocument = async ({ data, createdBy }) => {
   try {
     const { kategoriIds, ...rest } = data;
 
+    // Langkah 1: Buat dokumen
     const newDoc = await prisma.document.create({
       data: {
         ...rest,
@@ -96,10 +98,29 @@ exports.createDocument = async ({ data, createdBy }) => {
       },
     });
 
+    // Langkah 2: Generate URL download
+    const downloadUrl = `${baseUrl}/api/v1/documents/download/${newDoc.id}`;
+
+    // Langkah 3: Update URL ke database
+    const updatedDoc = await prisma.document.update({
+      where: { id: newDoc.id },
+      data: {
+        url: downloadUrl,
+      },
+      include: {
+        kategori: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
     return {
       success: true,
       message: "Document created successfully",
-      data: newDoc,
+      data: updatedDoc,
     };
   } catch (error) {
     console.error("Error in createDocument:", error);
@@ -123,8 +144,13 @@ exports.updateDocument = async (id, data, updatedBy) => {
 
     const { kategoriIds, filename, ...rest } = data;
 
+    let newUrl = undefined;
+
     if (filename && existing.filename && filename !== existing.filename) {
       await deleteFile(existing.filename);
+
+      // generate url baru karena file baru diupload
+      newUrl = `${baseUrl}/api/v1/documents/download/${id}`;
     }
 
     const updated = await prisma.document.update({
@@ -132,6 +158,7 @@ exports.updateDocument = async (id, data, updatedBy) => {
       data: {
         ...rest,
         ...(filename && { filename }),
+        ...(newUrl && { url: newUrl }), // simpan url baru jika ada
         updatedBy: updatedBy || "system",
         ...(kategoriIds && {
           kategori: {
