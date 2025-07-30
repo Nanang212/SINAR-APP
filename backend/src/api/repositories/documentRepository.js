@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { findAllBuilder } = require("../utils/query");
+const { deleteFile } = require("../utils/minioHelper");
 
 exports.findAllDocuments = async (params) => {
   return await findAllBuilder({
@@ -120,12 +121,17 @@ exports.updateDocument = async (id, data, updatedBy) => {
       };
     }
 
-    const { kategoriIds, ...rest } = data;
+    const { kategoriIds, filename, ...rest } = data;
+
+    if (filename && existing.filename && filename !== existing.filename) {
+      await deleteFile(existing.filename);
+    }
 
     const updated = await prisma.document.update({
       where: { id },
       data: {
         ...rest,
+        ...(filename && { filename }),
         updatedBy: updatedBy || "system",
         ...(kategoriIds && {
           kategori: {
