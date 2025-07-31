@@ -3,6 +3,7 @@ export { httpClient } from './api/http-client';
 export { authService } from './auth/auth.service';
 export { documentService } from './documents/document.service';
 export { categoryService } from './categories/category.service';
+export { userService } from './users/user.service';
 
 // Export types
 export type { ApiResponse, RequestConfig } from './api/http-client';
@@ -21,3 +22,9 @@ export type {
   Category,
   CategoriesResponse
 } from './categories/category.service';
+export type {
+  User,
+  UsersResponse,
+  CreateUserRequest,
+  UpdateUserRequest
+} from './users/user.service';

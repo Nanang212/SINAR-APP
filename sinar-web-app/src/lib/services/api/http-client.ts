@@ -6,6 +6,8 @@ export interface ApiResponse<T = any> {
   message: string;
   data?: T;
   error?: string;
+  total?: number;
+  page?: number;
 }
 
 export interface RequestConfig {
@@ -13,6 +15,7 @@ export interface RequestConfig {
   headers?: Record<string, string>;
   body?: any;
   timeout?: number;
+  responseType?: "json" | "blob" | "text";
 }
 
 class HttpClient {
@@ -34,6 +37,7 @@ class HttpClient {
       headers = {},
       body,
       timeout = this.timeout,
+      responseType = "json",
     } = config;
 
     const url = `${this.baseURL}${endpoint}`;
@@ -70,12 +74,17 @@ class HttpClient {
       clearTimeout(timeoutId);
 
       let responseData;
-      const contentType = response.headers.get("content-type");
-
-      if (contentType && contentType.includes("application/json")) {
-        responseData = await response.json();
+      
+      if (responseType === "blob") {
+        responseData = await response.blob();
       } else {
-        responseData = await response.text();
+        const contentType = response.headers.get("content-type");
+        
+        if (responseType === "text" || (contentType && !contentType.includes("application/json"))) {
+          responseData = await response.text();
+        } else {
+          responseData = await response.json();
+        }
       }
 
       if (!response.ok) {
@@ -101,6 +110,17 @@ class HttpClient {
         };
       }
 
+      // Handle blob responses
+      if (responseType === "blob") {
+        return {
+          status: true,
+          code: response.status,
+          message: "Success",
+          data: responseData,
+          headers: response.headers,
+        } as any;
+      }
+
       // Handle backend response format
       if (
         responseData &&
@@ -112,6 +132,8 @@ class HttpClient {
           code: responseData.code || response.status,
           message: responseData.message || "Success",
           data: responseData.data,
+          total: responseData.total, // Preserve total for pagination
+          page: responseData.page,   // Preserve page for pagination
         };
       }
 

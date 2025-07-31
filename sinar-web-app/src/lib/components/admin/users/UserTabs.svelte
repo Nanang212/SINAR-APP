@@ -18,8 +18,8 @@
   }: $$Props = $props();
 
   function setActiveTab(tab: string) {
-    console.log('DocumentTabs: Setting active tab to:', tab);
-    console.log('DocumentTabs: onTabChange exists:', !!onTabChange);
+    console.log('UserTabs: Setting active tab to:', tab);
+    console.log('UserTabs: onTabChange exists:', !!onTabChange);
     onTabChange?.(tab);
   }
 
@@ -43,8 +43,8 @@
 
 <!-- Page Header -->
 <div class="mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Master Document</h1>
-  <p class="text-gray-600 mt-1">Manage and browse documents</p>
+  <h1 class="text-2xl font-bold text-gray-900">Master User</h1>
+  <p class="text-gray-600 mt-1">Manage and browse users</p>
 </div>
 
 <!-- Tab Navigation and Search -->
@@ -68,7 +68,7 @@
     >
       <div class="flex items-center space-x-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v10a2 2 0 002 2z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
         </svg>
         <span>Browse</span>
       </div>
@@ -82,7 +82,7 @@
       <div class="relative">
         <input
           type="text"
-          placeholder="Search documents..."
+          placeholder="Search users..."
           class="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           value={searchTerm}
           oninput={handleSearchInput}
@@ -100,7 +100,7 @@
           onclick={handleRefresh}
           disabled={isLoading}
           class="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 focus:from-cyan-600 focus:to-sky-700 border border-cyan-500 rounded-md shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-400 transition-all duration-200"
-          aria-label="Refresh documents"
+          aria-label="Refresh users"
         >
           <svg
             class="w-4 h-4 {isLoading ? 'animate-spin' : ''}"
@@ -119,7 +119,7 @@
         
         <!-- Tooltip -->
         <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-          {isLoading ? 'Refreshing...' : 'Refresh documents'}
+          {isLoading ? 'Refreshing...' : 'Refresh users'}
           <!-- Tooltip arrow -->
           <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
         </div>

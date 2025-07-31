@@ -20,8 +20,24 @@ export interface DocumentsResponse {
   status: boolean;
   code: number;
   message: string;
-  total: number;
+  total?: number;
+  page?: number;
   data: Document[];
+}
+
+export interface PaginatedDocumentsResponse {
+  status: boolean;
+  code: number;
+  message: string;
+  total: number;
+  totalPages: number;
+  currentPage: number;
+  data: Document[];
+}
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
 }
 
 export interface UploadDocumentRequest {
@@ -62,6 +78,81 @@ class DocumentService {
           code: response.code,
           message: response.message,
           data: Array.isArray(documents) ? documents : [],
+        };
+      }
+
+      return {
+        status: false,
+        code: response.code,
+        message: response.message || 'Failed to fetch documents',
+        error: response.error || 'Failed to fetch documents',
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to fetch documents',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get paginated documents
+   */
+  async getPaginatedDocuments(params: PaginationParams = {}): Promise<ApiResponse<PaginatedDocumentsResponse>> {
+    try {
+      const { page = 1, limit = 10 } = params;
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      const response = await httpClient.authenticatedRequest<any>(
+        `${this.baseEndpoint}?${queryParams.toString()}`
+      );
+
+      console.log('Document service - paginated response:', response);
+      console.log('Document service - response.data:', response.data);
+      console.log('Document service - response.data type:', typeof response.data);
+      
+      if (response.status && response.data) {
+        // HTTP client now preserves total and page at response level
+        const documents = Array.isArray(response.data) ? response.data : [];
+        const total = response.total || 0;
+        const currentPage = response.page || page;
+        
+        // Calculate pagination info from total and limit
+        const totalPages = Math.ceil(total / limit);
+        
+        console.log('Service Debug:');
+        console.log('- Raw response:', response);
+        console.log('- Response.total:', response.total);
+        console.log('- Response.page:', response.page);
+        console.log('- Total from API:', total);
+        console.log('- Current page from API:', currentPage);
+        console.log('- Limit:', limit);
+        console.log('- Calculated totalPages:', totalPages);
+        console.log('- Documents array:', documents);
+        console.log('- Documents length:', documents.length);
+        
+        const paginatedResponse: PaginatedDocumentsResponse = {
+          status: response.status,
+          code: response.code,
+          message: response.message,
+          total: total,
+          totalPages: totalPages,
+          currentPage: currentPage,
+          data: documents,
+        };
+
+        console.log('Service returning paginatedResponse:', paginatedResponse);
+
+        return {
+          status: true,
+          code: response.code,
+          message: response.message,
+          data: paginatedResponse,
         };
       }
 
@@ -325,6 +416,92 @@ class DocumentService {
         status: false,
         code: 0,
         message: 'Failed to update document',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Download document by ID
+   */
+  async downloadDocument(id: string | number, originalName?: string): Promise<void> {
+    try {
+      const response = await httpClient.authenticatedRequest<Blob>(
+        `${this.baseEndpoint}/download/${id}`,
+        {
+          method: 'GET',
+          responseType: 'blob'
+        }
+      );
+
+      if (response.status && response.data instanceof Blob) {
+        // Create blob URL and trigger download
+        const url = window.URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Use original name if provided, otherwise try from Content-Disposition header
+        let filename = originalName || `document_${id}`;
+        
+        if (!originalName) {
+          const contentDisposition = (response as any).headers?.get('Content-Disposition');
+          if (contentDisposition) {
+            const match = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (match) {
+              filename = match[1];
+            }
+          }
+        }
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        throw new Error(response.message || 'Download failed');
+      }
+    } catch (error) {
+      console.error('Failed to download document:', error);
+      throw new Error(error instanceof Error ? error.message : 'Download failed');
+    }
+  }
+
+  /**
+   * Delete document by ID
+   */
+  async deleteDocument(id: string | number): Promise<ApiResponse<any>> {
+    try {
+      const response = await httpClient.authenticatedRequest<DocumentsResponse>(
+        `${this.adminBaseEndpoint}/${id}`,
+        {
+          method: 'DELETE'
+        }
+      );
+
+      console.log('Document service - delete response:', response);
+      
+      if (response.status) {
+        return {
+          status: true,
+          code: response.code,
+          message: response.message || 'Document deleted successfully',
+        };
+      }
+
+      return {
+        status: false,
+        code: response.code,
+        message: response.message || 'Failed to delete document',
+        error: response.error || 'Failed to delete document',
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to delete document',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
