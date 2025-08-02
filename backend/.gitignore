@@ -12,6 +12,8 @@ pgdata/*
 # Ignore MinIO internal files
 minio-data/
 minio-data/*
+backend/minio_data/
+backend/postgres_data/
 
 postgres_data/
 # Optional: ignore hidden system folders
