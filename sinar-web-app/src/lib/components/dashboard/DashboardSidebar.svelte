@@ -1,15 +1,34 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { authService } from '$lib/services/auth/auth.service';
+  import { browser } from '$app/environment';
   
   let isSidebarOpen = $state(false);
   let isCollapsed = $state(false);
   let isLocked = $state(true); // Default locked (always visible)
 
   let currentPath = $derived($page.url.pathname);
+  
+  // Only get user role in browser environment
+  let userRole = $derived(() => {
+    if (!browser) return null;
+    return authService.getCurrentUserRole();
+  });
+  
+  let isAdmin = $derived(() => {
+    if (!browser) return false;
+    return authService.isAdmin();
+  });
+  
+  let isUser = $derived(() => {
+    if (!browser) return false;
+    return authService.isUser();
+  });
 
   const menuSections = [
     {
       title: 'Main',
+      roles: ['admin', 'user'], // Available for both admin and user
       items: [
         {
           icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h2a2 2 0 012 2v2H8V5z"></path>`,
@@ -20,12 +39,8 @@
     },
     {
       title: 'Admin',
+      roles: ['admin'], // Only available for admin
       items: [
-        {
-          icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>`,
-          label: 'Master Document',
-          href: '/admin/documents'
-        },
         {
           icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>`,
           label: 'Master User',
@@ -35,11 +50,17 @@
           icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>`,
           label: 'Master Kategori',
           href: '/admin/categories'
+        },
+        {
+          icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>`,
+          label: 'Master Document',
+          href: '/admin/documents'
         }
       ]
     },
     {
       title: 'User',
+      roles: ['admin', 'user'], // Available for both admin and regular users
       items: [
         {
           icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>`,
@@ -59,6 +80,19 @@
       ]
     }
   ];
+
+  // Filter menu sections based on user role
+  const visibleMenuSections = $derived(() => {
+    const currentRole = userRole();
+    if (!browser || !currentRole) {
+      // During SSR or when no role, show main menu only
+      return menuSections.filter(section => section.title === 'Main');
+    }
+    
+    return menuSections.filter(section => 
+      section.roles.includes(currentRole)
+    );
+  });
 
   function toggleSidebar() {
     isSidebarOpen = !isSidebarOpen;
@@ -170,7 +204,7 @@
 
   <!-- Navigation Menu -->
   <nav class="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
-    {#each menuSections as section}
+    {#each visibleMenuSections() as section}
       <div>
         <!-- Section Title -->
         {#if !isCollapsed}

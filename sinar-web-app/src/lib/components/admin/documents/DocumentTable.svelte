@@ -169,6 +169,21 @@
     if (fetchOnMount) {
       fetchDocuments();
     }
+
+    // Add window focus listener to refresh data after download
+    const handleWindowFocus = async () => {
+      if (pendingDownloadRefresh) {
+        console.log('Window regained focus, refreshing document data after download...');
+        pendingDownloadRefresh = false;
+        await fetchDocuments();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   });
 
   // Public method to fetch documents (called from parent)
@@ -285,12 +300,17 @@
     }
   }
 
+  // Track if we need to refresh after download
+  let pendingDownloadRefresh = $state(false);
+
   async function handleDownload(doc: Document) {
     try {
       await documentService.downloadDocument(doc.id, doc.original_name);
+      console.log('Document downloaded successfully, will refresh when window regains focus...');
+      pendingDownloadRefresh = true;
     } catch (error) {
       console.error('Download failed:', error);
-      alert('Download failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      modalToastStore.error('Download failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   }
 

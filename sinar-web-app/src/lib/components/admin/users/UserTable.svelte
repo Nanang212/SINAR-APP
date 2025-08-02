@@ -4,13 +4,15 @@
     userService,
     type User as ApiUser,
   } from "@/lib/services/users/user.service";
+  import ConfirmationModal from '@/lib/components/ui/ConfirmationModal.svelte';
+  import { modalToastStore } from '@/lib/stores/modal-toast';
 
   interface User {
     id: string;
     username: string;
-    email: string;
     role: string;
     category_id: number | null;
+    category_name: string | null;
     is_active: boolean;
     created_at: string;
     updated_at: string;
@@ -40,31 +42,36 @@
   let users = $state<User[]>([]);
   let apiUsers = $state<ApiUser[]>([]);
 
+  // Modal state
+  let showDeleteModal = $state(false);
+  let userToDelete = $state<User | null>(null);
+  let isDeleting = $state(false);
+
   // Transform API user to table format
   function transformApiUser(apiUser: ApiUser): User {
     try {
       return {
         id: apiUser.id.toString(),
         username: apiUser.username || "Unknown",
-        email: apiUser.email || "No email",
-        role: apiUser.role || "user",
+        role: apiUser.role?.name || "user",
         category_id: apiUser.category_id,
+        category_name: apiUser.category?.name || null,
         is_active: apiUser.is_active ?? true,
         created_at: apiUser.created_at,
         updated_at: apiUser.updated_at,
         last_login: apiUser.last_login,
         profile_picture: apiUser.profile_picture,
         statusColor: getStatusColor(apiUser.is_active ?? true),
-        roleColor: getRoleColor(apiUser.role || "user"),
+        roleColor: getRoleColor(apiUser.role?.name || "user"),
       };
     } catch (error) {
       console.error("Error transforming user:", error, apiUser);
       return {
         id: apiUser.id?.toString() || "unknown",
         username: "Error loading user",
-        email: "unknown",
         role: "user",
         category_id: null,
+        category_name: null,
         is_active: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -95,82 +102,57 @@
     }
   }
 
-  // Fetch all users from API
+  // Fetch all users from API with pagination
   async function fetchUsers() {
     console.log("Starting fetchUsers...");
     isLoading = true;
     error = null;
 
     try {
-      console.log("Calling userService.getAllUsers()...");
-      const response = await userService.getAllUsers();
+      console.log("Calling userService.getAllUsersWithPagination()...");
+      const response = await userService.getAllUsersWithPagination({
+        limit: 10,
+        page: 1
+      });
       console.log("API Response:", response);
       console.log("Response status:", response.status);
       console.log("Response data:", response.data);
 
-      if (
-        response.status === true &&
-        response.data &&
-        Array.isArray(response.data)
-      ) {
-        console.log("Processing", response.data.length, "users...");
-        apiUsers = response.data; // Store original API users
-        users = response.data.map(transformApiUser);
+      // Check if response has the expected structure
+      let usersArray = null;
+      if (response.status === true && response.data) {
+        // Case 1: Direct API response structure
+        if (Array.isArray(response.data.data)) {
+          usersArray = response.data.data;
+          console.log("Found users in response.data.data");
+        }
+        // Case 2: Response wrapped in another data layer
+        else if (Array.isArray(response.data)) {
+          usersArray = response.data;
+          console.log("Found users in response.data");
+        }
+      }
+
+      if (usersArray && usersArray.length >= 0) {
+        console.log("Processing", usersArray.length, "users...");
+        apiUsers = usersArray; // Store original API users
+        users = usersArray.map(transformApiUser);
         console.log("Transformed users:", users);
         error = null; // Clear any previous errors
       } else {
-        // For now, create dummy data if API is not ready
-        console.warn("API not ready, using dummy data");
-        const dummyUsers = [
-          {
-            id: 1,
-            username: "admin",
-            email: "admin@example.com",
-            role: "admin",
-            category_id: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            last_login: new Date().toISOString(),
-            profile_picture: null,
-          },
-          {
-            id: 2,
-            username: "user1",
-            email: "user1@example.com",
-            role: "user",
-            category_id: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            last_login: null,
-            profile_picture: null,
-          }
-        ];
-        apiUsers = dummyUsers;
-        users = dummyUsers.map(transformApiUser);
-        error = null;
+        console.error("API call failed - debugging info:");
+        console.error("response.status:", response.status);
+        console.error("response.data:", response.data);
+        console.error("typeof response.data:", typeof response.data);
+        error = response.message || response.error || 'No users found or invalid response structure';
+        apiUsers = [];
+        users = [];
       }
     } catch (err) {
       console.error("Fetch Error:", err);
-      // Fallback to dummy data
-      const dummyUsers = [
-        {
-          id: 1,
-          username: "admin",
-          email: "admin@example.com",
-          role: "admin",
-          category_id: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          last_login: new Date().toISOString(),
-          profile_picture: null,
-        }
-      ];
-      apiUsers = dummyUsers;
-      users = dummyUsers.map(transformApiUser);
-      error = null;
+      error = err instanceof Error ? err.message : 'Unknown error occurred';
+      apiUsers = [];
+      users = [];
     } finally {
       isLoading = false;
       console.log("fetchUsers completed, isLoading:", isLoading);
@@ -218,8 +200,8 @@
       filtered = filtered.filter(
         (user) =>
           user.username.toLowerCase().includes(term) ||
-          user.email.toLowerCase().includes(term) ||
-          user.role.toLowerCase().includes(term)
+          user.role.toLowerCase().includes(term) ||
+          (user.category_name && user.category_name.toLowerCase().includes(term))
       );
     }
 
@@ -277,7 +259,37 @@
   }
 
   function handleDelete(user: User) {
-    onDelete?.(user);
+    userToDelete = user;
+    showDeleteModal = true;
+  }
+
+  async function confirmDelete() {
+    if (!userToDelete) return;
+
+    isDeleting = true;
+    try {
+      const response = await userService.deleteUser(userToDelete.id);
+      
+      if (response.status) {
+        modalToastStore.success('User deleted successfully!');
+        // Refresh the table
+        await fetchUsers();
+      } else {
+        modalToastStore.error(response.message || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Delete failed:', error);
+      modalToastStore.error('Failed to delete user: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      isDeleting = false;
+      showDeleteModal = false;
+      userToDelete = null;
+    }
+  }
+
+  function cancelDelete() {
+    showDeleteModal = false;
+    userToDelete = null;
   }
 
   function handleRowClick(user: User) {
@@ -323,6 +335,39 @@
         <span class="text-gray-700">Loading users...</span>
       </div>
     </div>
+  {:else if error}
+    <!-- Error State -->
+    <div class="flex justify-center items-center py-12">
+      <div class="text-center">
+        <svg
+          class="mx-auto h-12 w-12 text-red-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+          />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">
+          Failed to load users
+        </h3>
+        <p class="mt-1 text-sm text-gray-500">
+          {error}
+        </p>
+        <div class="mt-4">
+          <button
+            onclick={handleRefresh}
+            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    </div>
   {:else}
     <!-- Data Table -->
     <div class="mt-8 pr-4">
@@ -340,21 +385,17 @@
             </th>
             <th
               class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
-              onclick={() => handleSort("email")}
-            >
-              <div class="flex items-center space-x-1">
-                <span>Email</span>
-                <span class="text-gray-400">{getSortIcon("email")}</span>
-              </div>
-            </th>
-            <th
-              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
               onclick={() => handleSort("role")}
             >
               <div class="flex items-center space-x-1">
                 <span>Role</span>
                 <span class="text-gray-400">{getSortIcon("role")}</span>
               </div>
+            </th>
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200"
+            >
+              <span>Category</span>
             </th>
             <th
               class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
@@ -402,12 +443,20 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
-                <div class="text-sm text-gray-900">{user.email}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 {user.roleColor}">
                   {user.role}
                 </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+                <div class="text-sm text-gray-900">
+                  {#if user.category_name}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {user.category_name}
+                    </span>
+                  {:else}
+                    <span class="text-gray-400">No Category</span>
+                  {/if}
+                </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                 <span
@@ -422,24 +471,7 @@
                 {formatDate(user.created_at)}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div class="flex items-center" onclick={(e) => e.stopPropagation()}>
-                  <div class="relative group">
-                    <button
-                      class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                      aria-label="Edit user"
-                    >
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                      Edit
-                    </div>
-                  </div>
-                  
-                  <!-- Divider -->
-                  <div class="h-4 w-px bg-gray-300 mx-2"></div>
-                  
+                <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
                   <div class="relative group">
                     <button
                       class="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
@@ -542,3 +574,16 @@
     </div>
   {/if}
 </div>
+
+<!-- Delete Confirmation Modal -->
+<ConfirmationModal
+  isOpen={showDeleteModal}
+  title="Delete User"
+  message={`Are you sure you want to delete user "${userToDelete?.username}"? This action cannot be undone.`}
+  confirmText="Delete"
+  cancelText="Cancel"
+  confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
+  onConfirm={confirmDelete}
+  onCancel={cancelDelete}
+  isLoading={isDeleting}
+/>

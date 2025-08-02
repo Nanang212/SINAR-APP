@@ -3,9 +3,10 @@
   import { UserTabs, UserTable, UserForm } from "@/lib/components/admin/users";
   import type { User, CreateUserRequest, UpdateUserRequest } from "@/lib/services/users/user.service";
   import { userService } from "@/lib/services";
+  import { modalToastStore } from '$lib/stores/modal-toast';
 
   // Component state
-  let activeTab = $state("input");
+  let activeTab = $state("browse");
   let searchTerm = $state("");
   let isLoading = $state(false);
   let selectedUser = $state<User | null>(null);
@@ -53,34 +54,6 @@
     activeTab = "input"; // Switch to form tab for editing
   }
 
-  // User delete handler
-  async function handleUserDelete(user: any) {
-    console.log('Page: Delete user requested:', user);
-    
-    const confirmed = confirm(`Are you sure you want to delete user "${user.username}"?`);
-    if (!confirmed) return;
-
-    isLoading = true;
-    try {
-      const response = await userService.deleteUser(user.id);
-      
-      if (response.status) {
-        console.log('User deleted successfully');
-        // Refresh the table
-        if (userTableRef) {
-          await userTableRef.loadUsers();
-        }
-      } else {
-        console.error('Failed to delete user:', response.message);
-        alert(`Failed to delete user: ${response.message || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      alert('An error occurred while deleting the user');
-    } finally {
-      isLoading = false;
-    }
-  }
 
   // Form reset handler
   function handleReset() {
@@ -95,7 +68,8 @@
 
   // Form submit handler - NO API CALLS HERE!
   function handleFormSubmit() {
-    console.log('✅ REGULAR USERS PAGE - FIXED: Only handling UI state');
+    console.log('✅ FIXED VERSION: Page only handling UI state - NO API CALLS');
+    console.trace('Page handleFormSubmit call stack - SHOULD NOT CALL API');
     
     // UserForm already handled the API call successfully
     // This function ONLY handles UI state changes
@@ -145,7 +119,6 @@
         <UserTable 
           bind:this={userTableRef}
           fetchOnMount={true}
-          onDelete={handleUserDelete}
           onRefresh={() => console.log('Users refreshed')}
           onRowClick={handleUserRowClick}
         />

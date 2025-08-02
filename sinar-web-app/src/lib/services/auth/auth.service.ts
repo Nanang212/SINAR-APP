@@ -55,7 +55,9 @@ class AuthService {
         httpClient.setAuthToken(response.data.token);
 
         // Store user data in localStorage for persistence
-        localStorage.setItem("user_data", JSON.stringify(response.data.user));
+        if (typeof window !== "undefined") {
+          localStorage.setItem("user_data", JSON.stringify(response.data.user));
+        }
       }
 
       return response;
@@ -136,11 +138,44 @@ class AuthService {
   // Get current user data from localStorage
   getCurrentUser(): UserProfile | null {
     try {
-      const userData = localStorage.getItem("user_data");
-      return userData ? JSON.parse(userData) : null;
+      if (typeof window !== "undefined") {
+        const userData = localStorage.getItem("user_data");
+        return userData ? JSON.parse(userData) : null;
+      }
+      return null;
     } catch (error) {
       return null;
     }
+  }
+
+  // Get current user role (from localStorage or token)
+  getCurrentUserRole(): string | null {
+    // First try from localStorage (faster)
+    const userData = this.getCurrentUser();
+    if (userData?.role) {
+      return userData.role;
+    }
+
+    // Fallback to token if localStorage is not available
+    const token = httpClient.getAuthToken();
+    if (token) {
+      const tokenData = TokenHelper.getUserFromToken(token);
+      return tokenData?.role || null;
+    }
+
+    return null;
+  }
+
+  // Check if current user is admin
+  isAdmin(): boolean {
+    const role = this.getCurrentUserRole();
+    return role === 'admin';
+  }
+
+  // Check if current user is regular user
+  isUser(): boolean {
+    const role = this.getCurrentUserRole();
+    return role === 'user';
   }
 
   // Get user by ID from backend
@@ -238,7 +273,9 @@ class AuthService {
   // Clear user session
   private clearUserSession(): void {
     httpClient.clearAuthToken();
-    localStorage.removeItem("user_data");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("user_data");
+    }
   }
 }
 

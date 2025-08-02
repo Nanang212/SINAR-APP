@@ -241,17 +241,24 @@ class HttpClient {
   // Method to set authorization token
   setAuthToken(token: string): void {
     // This could be enhanced to store token and automatically add to headers
-    localStorage.setItem("auth_token", token);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("auth_token", token);
+    }
   }
 
   // Method to get authorization token
   getAuthToken(): string | null {
-    return localStorage.getItem("auth_token");
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("auth_token");
+    }
+    return null;
   }
 
   // Method to clear authorization token
   clearAuthToken(): void {
-    localStorage.removeItem("auth_token");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_token");
+    }
   }
 
   // Method to make authenticated requests

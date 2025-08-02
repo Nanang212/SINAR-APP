@@ -4,14 +4,35 @@ import { httpClient, type ApiResponse } from '../api/http-client';
 export interface User {
   id: number;
   username: string;
-  email: string;
-  role: string;
+  password?: string;
   category_id: number | null;
-  is_active: boolean;
   created_at: string;
+  created_by: number;
+  is_active: boolean;
+  role_id: number;
   updated_at: string;
-  last_login: string | null;
-  profile_picture: string | null;
+  updated_by: number | null;
+  role: {
+    id: number;
+    name: string;
+    is_active: boolean;
+    created_at: string;
+    created_by: number;
+    updated_at: string;
+    updated_by: number | null;
+  };
+  category: {
+    id: number;
+    name: string;
+    is_active: boolean;
+    created_at: string;
+    created_by: number;
+    updated_at: string;
+    updated_by: number | null;
+  } | null;
+  email?: string;
+  last_login?: string | null;
+  profile_picture?: string | null;
 }
 
 export interface UsersResponse {
@@ -24,25 +45,73 @@ export interface UsersResponse {
 
 export interface CreateUserRequest {
   username: string;
-  email: string;
   password: string;
-  role: string;
+  role_id: number;
   category_id?: number | null;
-  is_active?: boolean;
 }
 
 export interface UpdateUserRequest {
   username?: string;
-  email?: string;
-  password?: string;
-  role?: string;
+  role_id?: number;
   category_id?: number | null;
   is_active?: boolean;
+}
+
+export interface ResetPasswordRequest {
+  new_password: string;
+}
+
+export interface GetUsersParams {
+  limit?: number;
+  page?: number;
 }
 
 class UserService {
   private readonly baseEndpoint = '/api/v1/users';
   private readonly adminBaseEndpoint = '/api/v1/admin/users';
+
+  /**
+   * Get all users with pagination
+   */
+  async getAllUsersWithPagination(params?: GetUsersParams): Promise<ApiResponse<UsersResponse>> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.limit) {
+        queryParams.append('limit', params.limit.toString());
+      }
+      if (params?.page) {
+        queryParams.append('page', params.page.toString());
+      }
+
+      const url = `${this.baseEndpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await httpClient.authenticatedRequest<UsersResponse>(url);
+
+      console.log('User service - getAllUsersWithPagination response:', response);
+      
+      if (response.status && response.data) {
+        return {
+          status: true,
+          code: response.code,
+          message: response.message,
+          data: response.data,
+        };
+      }
+
+      return {
+        status: false,
+        code: response.code,
+        message: response.message || 'Failed to fetch users',
+        error: response.error || 'Failed to fetch users',
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to fetch users',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
 
   /**
    * Get all users
@@ -134,10 +203,7 @@ class UserService {
         `${this.adminBaseEndpoint}`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data),
+          body: data,
         }
       );
 
@@ -182,10 +248,7 @@ class UserService {
         `${this.adminBaseEndpoint}/${id}`,
         {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data),
+          body: data,
         }
       );
 
@@ -216,6 +279,46 @@ class UserService {
         status: false,
         code: 0,
         message: 'Failed to update user',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Reset user password
+   */
+  async resetPassword(id: string | number, data: ResetPasswordRequest): Promise<ApiResponse<any>> {
+    try {
+      const response = await httpClient.authenticatedRequest<any>(
+        `${this.adminBaseEndpoint}/${id}/reset-password`,
+        {
+          method: 'PUT',
+          body: data,
+        }
+      );
+
+      console.log('User service - reset password response:', response);
+      
+      if (response.status) {
+        return {
+          status: true,
+          code: response.code,
+          message: response.message,
+          data: response.data,
+        };
+      }
+
+      return {
+        status: false,
+        code: response.code,
+        message: response.message || 'Failed to reset password',
+        error: response.error || 'Failed to reset password',
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to reset password',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }

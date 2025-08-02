@@ -174,7 +174,24 @@
   function handleFileChange(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    selectedFileName = file ? file.name : '';
+    
+    if (file) {
+      // Validate file type
+      const allowedExtensions = ['.doc', '.docx'];
+      const fileName = file.name.toLowerCase();
+      const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!isValidType) {
+        modalToastStore.error('Only Word documents (.doc, .docx) are allowed');
+        input.value = ''; // Clear the input
+        selectedFileName = '';
+        return;
+      }
+      
+      selectedFileName = file.name;
+    } else {
+      selectedFileName = '';
+    }
   }
 
   function handleDragOver(event: DragEvent) {
@@ -185,10 +202,22 @@
     event.preventDefault();
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
+      const file = files[0];
+      
+      // Validate file type
+      const allowedExtensions = ['.doc', '.docx'];
+      const fileName = file.name.toLowerCase();
+      const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!isValidType) {
+        modalToastStore.error('Only Word documents (.doc, .docx) are allowed');
+        return;
+      }
+      
       const fileInput = document.getElementById('file') as HTMLInputElement;
       if (fileInput) {
         fileInput.files = files;
-        selectedFileName = files[0].name;
+        selectedFileName = file.name;
       }
     }
   }
@@ -221,21 +250,16 @@
     };
   });
 
-  // Get display text for selected categories
-  function getSelectedCategoriesText(): string {
-    if (selectedCategories.length === 0) {
-      return 'Select categories';
-    }
-    
-    const selectedNames = selectedCategories
-      .map(id => categories.find(cat => cat.id.toString() === id)?.name)
-      .filter(Boolean) as string[];
-    
-    if (selectedNames.length <= 2) {
-      return selectedNames.join(', ');
-    }
-    
-    return `${selectedNames.slice(0, 2).join(', ')} + ${selectedNames.length - 2} more`;
+  // Get selected categories for badges display
+  function getSelectedCategoriesForBadges() {
+    return selectedCategories
+      .map(id => categories.find(cat => cat.id.toString() === id))
+      .filter(Boolean);
+  }
+
+  // Remove a category from selection
+  function removeCategoryFromSelection(categoryId: string) {
+    selectedCategories = selectedCategories.filter(id => id !== categoryId);
   }
 </script>
 
@@ -304,15 +328,39 @@
           <button
             type="button"
             id="category-dropdown-button"
-            class="w-full px-4 py-3 text-base text-left border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between {selectedCategories.length === 0 ? 'text-red-500 border-red-300' : 'text-gray-900'} disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+            class="w-full px-4 py-3 text-base text-left border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between {selectedCategories.length === 0 ? 'text-red-500 border-red-300' : 'text-gray-900'} disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed min-h-[48px]"
             disabled={isFormDisabled}
             onclick={!isFormDisabled ? toggleCategoryDropdown : undefined}
           >
-            <span class="{selectedCategories.length === 0 ? 'text-gray-500' : 'text-gray-900'}">
-              {getSelectedCategoriesText()}
-            </span>
+            <div class="flex-1 flex flex-wrap gap-2 min-h-[20px] items-center">
+              {#if selectedCategories.length === 0}
+                <span class="text-gray-500">Select categories</span>
+              {:else}
+                {#each getSelectedCategoriesForBadges() as category (category.id)}
+                  <div class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                    <span>{category.name}</span>
+                    <button
+                      type="button"
+                      class="ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        if (!isFormDisabled) {
+                          removeCategoryFromSelection(category.id.toString());
+                        }
+                      }}
+                      disabled={isFormDisabled}
+                      title="Remove {category.name}"
+                    >
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                {/each}
+              {/if}
+            </div>
             <svg 
-              class="w-4 h-4 text-gray-400 transition-transform duration-200 {isCategoryDropdownOpen ? 'transform rotate-180' : ''}" 
+              class="w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 {isCategoryDropdownOpen ? 'transform rotate-180' : ''}" 
               fill="none" 
               stroke="currentColor" 
               viewBox="0 0 24 24"
@@ -406,14 +454,14 @@
               </span>
               or drag and drop
             </p>
-            <p class="text-xs text-gray-500">PDF, DOC, DOCX up to 10MB</p>
+            <p class="text-xs text-gray-500">Only Word documents (DOC, DOCX) up to 10MB</p>
           {/if}
           <input 
             type="file" 
             id="file" 
             name="file" 
             class="hidden" 
-            accept=".pdf,.doc,.docx"
+            accept=".doc,.docx"
             required={!isEditMode}
             disabled={isFormDisabled}
             onchange={handleFileChange}

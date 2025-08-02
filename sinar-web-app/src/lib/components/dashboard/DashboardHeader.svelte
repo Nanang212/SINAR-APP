@@ -210,7 +210,7 @@
 </script>
 
 <header
-  class="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 shadow-sm relative z-[100]"
+  class="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 shadow-sm relative z-[50]"
 >
   <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between items-center py-4">
@@ -218,9 +218,9 @@
       <div></div>
 
       <!-- User Info & Actions -->
-      <div class="flex items-center space-x-4">
-        <div class="text-right">
-          <p class="text-sm font-medium text-gray-700">Welcome, {userName}</p>
+      <div class="flex items-center space-x-3 min-w-0">
+        <div class="text-right min-w-0 flex-shrink">
+          <p class="text-sm font-medium text-gray-700 truncate" title="Welcome, {userName}">Welcome, {userName}</p>
           <p class="text-xs text-gray-500">{currentTime}</p>
         </div>
 
@@ -238,12 +238,12 @@
           <!-- Dropdown Menu -->
           {#if showProfileDropdown}
             <div
-              class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-[99999]"
+              class="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-[99999]"
             >
               <div class="py-1">
                 <!-- Profile Info -->
                 <div class="px-4 py-2 border-b border-gray-100">
-                  <p class="text-sm font-medium text-gray-900">{userName}</p>
+                  <p class="text-sm font-medium text-gray-900 truncate" title={userName}>{userName}</p>
                   <p class="text-xs text-gray-500">User Profile</p>
                 </div>
 
