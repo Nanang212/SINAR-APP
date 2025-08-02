@@ -6,7 +6,6 @@
     type PaginatedDocumentsResponse,
     type PaginationParams,
   } from "@/lib/services";
-  import ConfirmationModal from '@/lib/components/ui/ConfirmationModal.svelte';
   import { modalToastStore } from '@/lib/stores/modal-toast';
 
   interface Document {
@@ -24,16 +23,16 @@
 
   interface $$Props {
     fetchOnMount?: boolean;
-    onDelete?: (document: Document) => void;
     onRefresh?: () => void;
     onRowClick?: (document: ApiDocument) => void;
+    searchTerm?: string;
   }
 
   let {
     fetchOnMount = false,
-    onDelete,
     onRefresh,
     onRowClick,
+    searchTerm = "",
   }: $$Props = $props();
 
   // Component state
@@ -108,16 +107,10 @@
         limit: 1000 // Get all documents for client-side filtering
       });
       console.log("API Response:", response);
-      console.log("Response status:", response.status);
-      console.log("Response data:", response.data);
-      console.log("Response data type:", typeof response.data);
-      console.log("Is response.data array?", Array.isArray(response.data));
-
+      
       if (response.status === true && response.data) {
         const paginatedData = response.data;
         console.log("PaginatedData:", paginatedData);
-        console.log("PaginatedData.data:", paginatedData.data);
-        console.log("PaginatedData.total:", paginatedData.total);
         
         if (paginatedData.data && Array.isArray(paginatedData.data)) {
           console.log("Processing", paginatedData.data.length, "documents...");
@@ -125,7 +118,6 @@
           documents = paginatedData.data.map(transformApiDocument);
           totalRecords = paginatedData.total || 0;
           console.log("Transformed documents:", documents);
-          console.log("Total records set to:", totalRecords);
           error = null; // Clear any previous errors
         } else {
           console.error("Invalid response format - paginatedData:", paginatedData);
@@ -193,21 +185,14 @@
 
   // Public method to set search term (called from parent)
   export function setSearchTerm(term: string) {
-    searchTerm = term;
-    currentPage = 1; // Reset to first page when searching
+    // Search is handled by parent through searchTerm prop
   }
 
   // Table state
-  let searchTerm = $state("");
   let sortField = $state<keyof Document | null>(null);
   let sortDirection = $state<"asc" | "desc">("asc");
   let currentPage = $state(1);
   let pageSize = $state(10);
-
-  // Modal state
-  let showDeleteModal = $state(false);
-  let documentToDelete = $state<Document | null>(null);
-  let isDeleting = $state(false);
 
   // Pagination state
   let totalRecords = $state(0);
@@ -241,12 +226,6 @@
     Math.ceil(filteredData().length / pageSize)
   );
 
-  function handleSearchChange(event: Event) {
-    const input = event.target as HTMLInputElement;
-    searchTerm = input.value;
-    currentPage = 1; // Reset to first page when searching
-  }
-
   function handlePageChange(newPage: number) {
     if (newPage >= 1 && newPage <= totalPages()) {
       currentPage = newPage;
@@ -265,51 +244,6 @@
   function getSortIcon(field: keyof Document) {
     if (sortField !== field) return "↕";
     return sortDirection === "asc" ? "↑" : "↓";
-  }
-
-  function handleDelete(doc: Document) {
-    documentToDelete = doc;
-    showDeleteModal = true;
-  }
-
-  async function confirmDelete() {
-    if (!documentToDelete) return;
-
-    isDeleting = true;
-    try {
-      const response = await documentService.deleteDocument(documentToDelete.id);
-      
-      if (response.status) {
-        modalToastStore.success('Document deleted successfully!');
-        
-        // Calculate if current page will be empty after deletion
-        const remainingRecords = totalRecords - 1;
-        const maxPageAfterDelete = Math.ceil(remainingRecords / pageSize);
-        
-        // If current page would be empty after delete, go to previous page
-        if (currentPage > maxPageAfterDelete && maxPageAfterDelete > 0) {
-          currentPage = maxPageAfterDelete;
-        }
-        
-        // Refresh the document list after successful deletion
-        await fetchDocuments();
-        onDelete?.(documentToDelete);
-      } else {
-        modalToastStore.error('Failed to delete document: ' + response.message);
-      }
-    } catch (error) {
-      console.error('Delete failed:', error);
-      modalToastStore.error('Failed to delete document: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      isDeleting = false;
-      showDeleteModal = false;
-      documentToDelete = null;
-    }
-  }
-
-  function cancelDelete() {
-    showDeleteModal = false;
-    documentToDelete = null;
   }
 
   function handleRowClick(doc: Document) {
@@ -348,7 +282,38 @@
 </script>
 
 <div class="pl-6 pr-8 pb-6 pt-12">
-
+  <!-- Error State -->
+  {#if error}
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+      <div class="flex">
+        <svg
+          class="w-5 h-5 text-red-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            Error loading documents
+          </h3>
+          <p class="mt-1 text-sm text-red-700">{error}</p>
+          <button
+            onclick={handleRefresh}
+            class="mt-2 text-sm font-medium text-red-800 hover:text-red-900 underline"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <!-- Loading State -->
   {#if isLoading}
@@ -374,7 +339,7 @@
     <!-- Data Table -->
     <div class="mt-8 pr-4">
       <table class="w-full divide-y divide-gray-200 border border-gray-200">
-        <thead class="bg-gray-50 sticky top-[60px] z-10">
+        <thead class="bg-gray-50 sticky top-0 z-10">
           <tr>
             <th
               class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
@@ -466,7 +431,7 @@
                 {formatDate(doc.uploaded_at)}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div class="flex items-center" onclick={(e) => e.stopPropagation()}>
+                <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
                   <div class="relative group">
                     <button
                       onclick={() => handleDownload(doc)}
@@ -479,24 +444,6 @@
                     </button>
                     <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                       Download
-                    </div>
-                  </div>
-                  
-                  <!-- Divider -->
-                  <div class="h-4 w-px bg-gray-300 mx-2"></div>
-                  
-                  <div class="relative group">
-                    <button
-                      class="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-                      onclick={() => handleDelete(doc)}
-                      aria-label="Delete document"
-                    >
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                      Delete
                     </div>
                   </div>
                 </div>
@@ -529,7 +476,7 @@
         <p class="mt-1 text-sm text-gray-500">
           {searchTerm
             ? "Try adjusting your search terms."
-            : "Get started by adding some documents."}
+            : "No documents available."}
         </p>
       </div>
     {/if}
@@ -590,16 +537,3 @@
     </div>
   {/if}
 </div>
-
-<!-- Delete Confirmation Modal -->
-<ConfirmationModal
-  isOpen={showDeleteModal}
-  title="Delete Document"
-  message={`Are you sure you want to delete "${documentToDelete?.title}"? This action cannot be undone.`}
-  confirmText="Delete"
-  cancelText="Cancel"
-  confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
-  onConfirm={confirmDelete}
-  onCancel={cancelDelete}
-  isLoading={isDeleting}
-/>

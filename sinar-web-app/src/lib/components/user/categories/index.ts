@@ -1,0 +1,1 @@
+export { default as CategoryListTable } from './CategoryListTable.svelte';

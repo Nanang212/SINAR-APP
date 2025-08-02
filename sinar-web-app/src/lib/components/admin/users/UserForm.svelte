@@ -17,15 +17,28 @@
   let formRef: HTMLDivElement;
   let isSubmitting = $state(false);
   let isFormDisabled = $state(false);
+  let username = $state('');
+  let password = $state('');
   let categories: Category[] = $state([]);
   let categoriesLoading = $state(true);
   let selectedCategoryId = $state<string>('');
   let isCategoryDropdownOpen = $state(false);
-  let selectedRoleId = $state<string>('2'); // Default to user role
+  let selectedRoleId = $state<string>(''); // Will be set based on mode
   let isRoleDropdownOpen = $state(false);
   
   // Check if we're in edit mode
   const isEditMode = $derived(userData !== null);
+
+  // Check if form is valid for submission
+  const isFormValid = $derived(() => {
+    if (isEditMode) {
+      // For edit mode, only username is required
+      return username.trim().length > 0;
+    } else {
+      // For create mode, both username and password are required
+      return username.trim().length > 0 && password.trim().length > 0;
+    }
+  });
 
   // Role options with IDs (sesuai dengan backend)
   const roleOptions = [
@@ -42,6 +55,9 @@
   $effect(() => {
     if (userData && formRef) {
       populateForm(userData);
+    } else if (!userData) {
+      // Set default for create mode
+      selectedRoleId = '2'; // Default to user role for new users
     }
   });
 
@@ -67,15 +83,12 @@
     const form = formRef;
     if (!form) return;
 
-    // Populate basic fields
-    (form.querySelector('#username') as HTMLInputElement).value = user.username || '';
+    // Populate basic fields and state
+    username = user.username || '';
+    (form.querySelector('#username') as HTMLInputElement).value = username;
     
-    // Populate role - map role name to role_id
-    if (user.role === 'admin') {
-      selectedRoleId = '1';
-    } else {
-      selectedRoleId = '2'; // default to user
-    }
+    // Populate role - use role_id directly from API response
+    selectedRoleId = user.role_id ? user.role_id.toString() : '2';
     
     // Populate category
     selectedCategoryId = user.category_id ? user.category_id.toString() : '';
@@ -170,10 +183,17 @@
 
   function handleReset() {
     selectedCategoryId = '';
-    selectedRoleId = '2'; // Reset to default user role
+    // Set role based on mode: edit mode keeps original role, create mode defaults to user
+    selectedRoleId = isEditMode && userData ? 
+      (userData.role_id ? userData.role_id.toString() : '2') : 
+      '2'; // Default to user role for new users
     isCategoryDropdownOpen = false;
     isRoleDropdownOpen = false;
     isFormDisabled = false;
+    
+    // Reset state variables
+    username = '';
+    password = '';
     
     // Reset form inputs manually
     const usernameInput = formRef?.querySelector('#username') as HTMLInputElement;
@@ -181,6 +201,11 @@
     
     if (usernameInput) usernameInput.value = '';
     if (passwordInput) passwordInput.value = '';
+    
+    // In edit mode, repopulate with original data
+    if (isEditMode && userData) {
+      populateForm(userData);
+    }
     
     onReset?.();
   }
@@ -344,6 +369,7 @@
           disabled={isFormDisabled}
           autocomplete="username"
           onkeydown={handleKeyDown}
+          bind:value={username}
           class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
           placeholder="Enter username"
         />
@@ -363,6 +389,7 @@
             disabled={isFormDisabled}
             autocomplete="new-password"
             onkeydown={handleKeyDown}
+            bind:value={password}
             class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
             placeholder="Enter password"
           />
@@ -568,7 +595,7 @@
         <button
           type="button"
           onclick={handleFormSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !isFormValid()}
           class="px-6 py-3 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
         >
           {#if isSubmitting}
