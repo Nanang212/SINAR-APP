@@ -3,6 +3,7 @@ const documentReportRepository = require("../repositories/documentReportReposito
 const documentRepository = require("../repositories/documentRepository");
 const minioClient = require("../../config/minioClient");
 const { minio } = require("../../config/dotenv");
+const { streamMedia } = require("../utils/minioHelper");
 
 // ✅ Get all document reports
 exports.getAllReports = async (params) => {
@@ -138,5 +139,23 @@ exports.downloadReportMedia = async ({ reportId, user }) => {
   } catch (error) {
     console.error("DownloadReportMedia Error:", error);
     throw { code: 500, message: "Failed to download media from MinIO" };
+  }
+};
+
+exports.previewReportMedia = async ({ filename, req, res }) => {
+  // Validasi filename
+  if (!filename || typeof filename !== "string" || filename.includes("..")) {
+    throw { code: 400, message: "Invalid or unsafe filename" };
+  }
+
+  try {
+    // Lanjutkan ke streaming via helper
+    await streamMedia(filename, req, res);
+  } catch (err) {
+    console.error("❌ StreamMedia failed:", err);
+    throw {
+      code: 500,
+      message: "Failed to stream media from storage",
+    };
   }
 };

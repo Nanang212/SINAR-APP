@@ -1,6 +1,7 @@
 const documentRepository = require("../repositories/documentRepository");
 const minioClient = require("../../config/minioClient");
 const { minio } = require("../../config/dotenv");
+const { streamDocument } = require("../utils/minioHelper");
 
 exports.getAllDocuments = async (params) => {
   return await documentRepository.findAllDocuments(params);
@@ -60,4 +61,22 @@ exports.downloadDocument = async ({ id, user }) => {
     console.error("DownloadDocument Error:", error);
     throw { code: 500, message: "Failed to download document from MinIO" };
   }
+};
+
+exports.previewDocument = async ({ id, user, req, res }) => {
+  const doc = await documentRepository.findDocumentById(id);
+
+  if (!doc) {
+    throw { code: 404, message: "Document not found or inactive" };
+  }
+
+  const isAdmin = user.role?.toLowerCase() === "admin";
+  const allowed = doc.kategori?.some((cat) => cat.id === user.category_id);
+
+  if (!isAdmin && !allowed) {
+    throw { code: 403, message: "Forbidden: You can't access this document" };
+  }
+
+  // ✅ Gunakan helper untuk streaming preview
+  await streamDocument(doc.filename, req, res);
 };

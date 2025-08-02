@@ -10,32 +10,47 @@ const {
 } = require("../utils/response");
 const { baseUrl } = require("../../config/dotenv");
 
-// 📄 GET All Reports
 exports.getAllReports = async (req, res) => {
   try {
-    const data = await documentReportService.getAllReports(req.query);
-
+    const result = await documentReportService.getAllReports(req.query);
     const host = `${baseUrl}`;
-    const formatted = data.map((report) => ({
-      ...report,
+    const reports = Array.isArray(result?.data) ? result.data : [];
+
+    const formatted = reports.map((report) => ({
+      id: report.id,
+      type: report.type,
       content: report.content
         ? `${host}/api/v1/admin/reports/download/${report.id}`
         : null,
+      preview_url: report.content
+        ? `${host}/api/v1/admin/reports/preview/${report.id}`
+        : null,
+      original_name: report.original_name,
+      description: report.description,
+      is_downloaded: report.is_downloaded,
+      downloaded_at: report.downloaded_at,
+      created_at: report.created_at,
+      created_by: report.created_by,
+      updated_at: report.updated_at,
+      updated_by: report.updated_by,
       document: report.document
         ? {
             ...report.document,
             url: `${host}/api/v1/documents/download/${report.document.id}`,
           }
         : null,
+      user: report.user,
     }));
 
-    successList(res, "Successfully fetched reports", formatted);
+    successList(res, "Successfully fetched reports", {
+      ...result,
+      data: formatted,
+    });
   } catch (err) {
     errorStatus(res, err.code || 500, err.message);
   }
 };
 
-// 🔍 GET Report by ID
 exports.getReportById = async (req, res) => {
   try {
     const report = await documentReportService.getReportById(+req.params.id);
@@ -43,16 +58,29 @@ exports.getReportById = async (req, res) => {
 
     const host = `${baseUrl}`;
     const formatted = {
-      ...report,
+      id: report.id,
+      type: report.type,
       content: report.content
         ? `${host}/api/v1/reports/download/${report.id}`
         : null,
+      preview_url: report.content
+        ? `${host}/api/v1/admin/reports/preview/${report.id}`
+        : null,
+      original_name: report.original_name,
+      description: report.description,
+      is_downloaded: report.is_downloaded,
+      downloaded_at: report.downloaded_at,
+      created_at: report.created_at,
+      created_by: report.created_by,
+      updated_at: report.updated_at,
+      updated_by: report.updated_by,
       document: report.document
         ? {
             ...report.document,
             url: `${host}/api/v1/documents/download/${report.document.id}`,
           }
         : null,
+      user: report.user,
     };
 
     successList(res, "Report found", [formatted]);
@@ -61,116 +89,134 @@ exports.getReportById = async (req, res) => {
   }
 };
 
-// ➕ CREATE Report
 exports.createReport = async (req, res) => {
   try {
-    const file = req.file;
-    if (file) {
-      const isVideo = file.mimetype.startsWith("video");
-      const isAudio = file.mimetype.startsWith("audio");
+    const files = req.uploadedFiles || [];
+
+    // Validasi ukuran file tiap jenis
+    for (const file of files) {
+      const isVideo = file.type === "VIDEO";
+      const isAudio = file.type === "AUDIO";
 
       if (isVideo && file.size > 500 * 1024 * 1024) {
-        return errorStatus(res, 400, "Video size exceeds 500MB limit");
+        return errorStatus(
+          res,
+          400,
+          `Video file ${file.originalName} exceeds 500MB limit`
+        );
       }
 
       if (isAudio && file.size > 30 * 1024 * 1024) {
-        return errorStatus(res, 400, "Audio size exceeds 30MB limit");
+        return errorStatus(
+          res,
+          400,
+          `Audio file ${file.originalName} exceeds 30MB limit`
+        );
       }
     }
 
-    const data = {
-      ...req.body,
-      content: req.minioFilename,
-      original_name: req.originalFileName,
-    };
+    const createdReports = [];
 
-    const result = await documentReportService.createReport({
-      data,
-      user: req.user,
-    });
+    for (const file of files) {
+      const data = {
+        ...req.body,
+        type: file.type,
+        content: file.filename,
+        original_name: file.originalName,
+      };
 
-    if (!result.success) {
-      return errorStatus(res, result.code || 500, result.msg);
+      const result = await documentReportService.createReport({
+        data,
+        user: req.user,
+      });
+
+      if (!result.success) {
+        return errorStatus(res, result.code || 500, result.msg);
+      }
+
+      const host = `${baseUrl}`;
+      const formatted = {
+        ...result.data,
+        content: result.data.content
+          ? `${host}/api/v1/admin/reports/download/${result.data.id}`
+          : null,
+        document: result.data.document
+          ? {
+              ...result.data.document,
+              url: `${host}/api/v1/documents/download/${result.data.document.id}`,
+            }
+          : null,
+      };
+
+      createdReports.push(formatted);
     }
 
-    const host = `${baseUrl}`;
-    const formatted = {
-      ...result.data,
-      content: result.data.content
-        ? `${host}/api/v1/reports/download/${result.data.id}`
-        : null,
-      document: result.data.document
-        ? {
-            ...result.data.document,
-            url: `${host}/api/v1/documents/download/${result.data.document.id}`,
-          }
-        : null,
-    };
-
-    successCreate(res, "Report created", formatted);
+    successCreate(res, "Multiple reports created", createdReports);
   } catch (err) {
     console.error("CreateReport Error:", err);
     errorStatus(res, err.code || 500, err.message);
   }
 };
 
-// ✏️ UPDATE Report
 exports.updateReport = async (req, res) => {
   try {
-    const file = req.file;
     const id = +req.params.id;
+    const files = req.uploadedFiles || [];
 
-    if (file) {
-      const isVideo = file.mimetype.startsWith("video");
-      const isAudio = file.mimetype.startsWith("audio");
-
-      if (isVideo && file.size > 500 * 1024 * 1024) {
+    // Validasi size untuk masing-masing file
+    for (const file of files) {
+      if (file.type === "VIDEO" && file.size > 500 * 1024 * 1024) {
         return errorStatus(res, 400, "Video size exceeds 500MB limit");
       }
-
-      if (isAudio && file.size > 30 * 1024 * 1024) {
+      if (file.type === "AUDIO" && file.size > 30 * 1024 * 1024) {
         return errorStatus(res, 400, "Audio size exceeds 30MB limit");
       }
     }
 
-    const updatedData = {
-      ...req.body,
-      content: req.minioFilename || undefined,
-      original_name: req.originalFileName || undefined,
-    };
+    const results = [];
 
-    const updated = await documentReportService.updateReport(
-      id,
-      updatedData,
-      req.user
-    );
+    for (const file of files) {
+      const updatedData = {
+        content: file.filename,
+        original_name: file.originalName,
+        type: file.type,
+        description: req.body.description,
+      };
 
-    if (!updated.success) {
-      return errorStatus(res, updated.code || 500, updated.msg);
+      const updated = await documentReportService.updateReport(
+        id,
+        updatedData,
+        req.user
+      );
+
+      if (!updated.success) {
+        return errorStatus(res, updated.code || 500, updated.msg);
+      }
+
+      const host = `${baseUrl}`;
+      const formatted = {
+        ...updated.data,
+        content: updated.data.content
+          ? `${host}/api/v1/reports/download/${updated.data.id}`
+          : null,
+        document: updated.data.document
+          ? {
+              ...updated.data.document,
+              url: `${host}/api/v1/documents/download/${updated.data.document.id}`,
+            }
+          : null,
+      };
+
+      results.push(formatted);
     }
 
-    const host = `${baseUrl}`;
-    const formatted = {
-      ...updated.data,
-      content: updated.data.content
-        ? `${host}/api/v1/reports/download/${updated.data.id}`
-        : null,
-      document: updated.data.document
-        ? {
-            ...updated.data.document,
-            url: `${host}/api/v1/documents/download/${updated.data.document.id}`,
-          }
-        : null,
-    };
-
-    successUpdate(res, "Report updated", formatted);
+    successUpdate(res, "Reports updated", results);
   } catch (err) {
     console.error("UpdateReport Error:", err);
     errorStatus(res, err.code || 500, err.message);
   }
 };
 
-// ❌ DELETE Report
 exports.deleteReport = async (req, res) => {
   try {
     const result = await documentReportService.deleteReport(+req.params.id);
@@ -185,7 +231,6 @@ exports.deleteReport = async (req, res) => {
   }
 };
 
-// 📥 DOWNLOAD Media
 exports.downloadReportMedia = async (req, res) => {
   try {
     const { stream, filename } =
@@ -197,6 +242,39 @@ exports.downloadReportMedia = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     stream.pipe(res);
   } catch (err) {
+    errorStatus(res, err.code || 500, err.message);
+  }
+};
+
+exports.previewReportMedia = async (req, res) => {
+  try {
+    const reportId = +req.params.id;
+    const report = await documentReportService.getReportById(reportId);
+
+    if (!report) return notFound(res, "Report not found");
+
+    const user = req.user;
+
+    // Optional: validasi akses berdasarkan kategori jika perlu
+    if (
+      user.role !== "admin" &&
+      report.document?.kategori?.id !== user.category_id
+    ) {
+      return errorStatus(res, 403, "Forbidden: You can't access this report");
+    }
+
+    const filename = report.content;
+    if (!filename) {
+      return errorStatus(res, 400, "No media file associated with this report");
+    }
+
+    await documentReportService.previewReportMedia({
+      filename,
+      req,
+      res,
+    });
+  } catch (err) {
+    console.error("PreviewReportMedia Error:", err);
     errorStatus(res, err.code || 500, err.message);
   }
 };

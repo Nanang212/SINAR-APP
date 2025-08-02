@@ -13,12 +13,12 @@ const allowedMimeTypes = [
 ];
 
 const allowedMediaTypes = [
-  "audio/mpeg",     // .mp3
-  "audio/wav",      // .wav
-  "audio/x-m4a",    // .m4a (variasi umum)
-  "audio/mp4",      // .m4a juga kadang ini
-  "video/mp4",      // .mp4
-  "video/mpeg",     // .mpeg
+  "audio/mpeg", // .mp3
+  "audio/wav", // .wav
+  "audio/x-m4a", // .m4a (variasi umum)
+  "audio/mp4", // .m4a juga kadang ini
+  "video/mp4", // .mp4
+  "video/mpeg", // .mpeg
 ];
 
 const uploadToMinio = (fieldName) => {
@@ -67,39 +67,50 @@ const uploadToMinio = (fieldName) => {
 };
 
 // 🎵 Upload audio/video (pakai original name sebagai filename di MinIO)
-const uploadMediaToMinio = (fieldName, subfolder = "") => {
+const uploadMediaToMinio = (
+  fields = ["video", "audio"],
+  subfolder = "report"
+) => {
+  const multerFields = fields.map((field) => ({ name: field, maxCount: 1 }));
+
   return [
-    upload.single(fieldName),
+    upload.fields(multerFields),
     async (req, res, next) => {
       try {
-        if (!req.file && req.method === "POST") {
-          return res.status(400).json({ message: "No media file uploaded" });
+        if (!req.files || Object.keys(req.files).length === 0) {
+          return res.status(400).json({ message: "No media files uploaded" });
         }
 
-        if (!req.file) return next();
+        req.uploadedFiles = [];
 
-        if (!allowedMediaTypes.includes(req.file.mimetype)) {
-          return res
-            .status(400)
-            .json({ message: "Invalid media type. Only audio/video allowed." });
-        }
+        for (const field of fields) {
+          const file = req.files[field]?.[0];
+          if (!file) continue;
 
-        const filename = req.file.originalname;
-        const objectName = subfolder ? `${subfolder}/${filename}` : filename;
-
-        // 👉 Ubah bucket ke "report"
-        await minioClient.putObject(
-          minio.bucketReport, // <- pakai bucket baru
-          objectName,
-          req.file.buffer,
-          req.file.size,
-          {
-            "Content-Type": req.file.mimetype,
+          if (!allowedMediaTypes.includes(file.mimetype)) {
+            return res.status(400).json({
+              message: `Invalid media type for field "${field}". Only audio/video allowed.`,
+            });
           }
-        );
 
-        req.minioFilename = objectName;
-        req.originalFileName = filename;
+          const filename = file.originalname;
+          const objectName = subfolder ? `${subfolder}/${filename}` : filename;
+
+          await minioClient.putObject(
+            minio.bucketReport,
+            objectName,
+            file.buffer,
+            file.size,
+            { "Content-Type": file.mimetype }
+          );
+
+          req.uploadedFiles.push({
+            field,
+            type: file.mimetype.startsWith("video") ? "VIDEO" : "AUDIO",
+            filename: objectName,
+            originalName: file.originalname,
+          });
+        }
 
         next();
       } catch (err) {
@@ -111,7 +122,6 @@ const uploadMediaToMinio = (fieldName, subfolder = "") => {
     },
   ];
 };
-
 
 module.exports = {
   uploadToMinio,

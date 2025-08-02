@@ -12,19 +12,20 @@ router.get("/:id", verifyToken, documentReportController.getReportById);
 router.post(
   "/",
   verifyToken,
-  uploadMediaToMinio("file", "report"),
+  uploadMediaToMinio(["audio", "video"], "report"),
   documentReportController.createReport
 );
 
 router.put(
   "/:id",
   verifyToken,
-  uploadMediaToMinio("file", "report"),
+  uploadMediaToMinio(["audio", "video"], "report"),
   documentReportController.updateReport
 );
 
 router.delete("/:id", verifyToken, documentReportController.deleteReport);
 
 router.get("/download/:id", verifyToken, documentReportController.downloadReportMedia);
+router.get("/preview/:id", verifyToken, documentReportController.previewReportMedia);
 
 module.exports = router;

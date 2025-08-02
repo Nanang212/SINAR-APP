@@ -229,3 +229,21 @@ exports.downloadDocument = async (req, res) => {
     });
   }
 };
+
+exports.previewDocument = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    await documentService.previewDocument({ id, user: req.user, req, res });
+    // streaming handled directly by service via helper
+  } catch (err) {
+    console.error("PreviewDocument Error:", err);
+    const code = err.code || 500;
+    const message = err.message || "Failed to preview document";
+
+    return res.status(code).json({
+      status: false,
+      code,
+      message,
+    });
+  }
+};

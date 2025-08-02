@@ -6,6 +6,7 @@ const { verifyToken } = require("../../../middlewares/authMiddleware");
 
 // URUTAN TEPAT agar tidak bentrok
 router.get("/download/:id", verifyToken, documentController.downloadDocument);
+router.get("/preview/:id", verifyToken, documentController.previewDocument);
 router.get("/", verifyToken, documentController.getAllDocuments);
 router.get("/:id", verifyToken, documentController.getDocumentById);
 
