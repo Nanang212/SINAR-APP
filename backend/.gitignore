@@ -13,9 +13,13 @@ pgdata/*
 minio-data/
 minio-data/*
 
+postgres_data/
 # Optional: ignore hidden system folders
 minio.sys/
 minio.sys/*
 
 # Jangan track file *.pid
 *.pid
+
+backend/minio_data/
+backend/postgres_data/
