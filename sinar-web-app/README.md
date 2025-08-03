@@ -1,41 +1,17 @@
-# SINAR Web App
+# SINAR Web Application
 
-Modern, responsive web application built with SvelteKit and TypeScript featuring glassmorphism design, interactive animations, and modular architecture.
+A modern document management system built with SvelteKit, TypeScript, and Tailwind CSS featuring role-based access control, document management, and comprehensive admin tools.
 
 ![SINAR Logo](static/assets/logo.png)
 
-## 🚀 Features
+## 🚀 Tech Stack
 
-- **Modern UI/UX**: Glassmorphism design with interactive mouse-following light gradients
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-- **Type Safety**: Full TypeScript support with strict configurations
-- **Modular Architecture**: Component-based structure for scalability
-- **Interactive Animations**: CSS animations and real-time mouse tracking effects
-- **Hot Reload**: Fast development with Vite HMR
-- **Code Quality**: ESLint, Prettier, and Svelte Check integration
-
-## 🛠️ Tech Stack
-
-### Core Framework
-- **[SvelteKit](https://kit.svelte.dev/)** `^2.26.0` - Full-stack framework
-- **[Svelte 5](https://svelte.dev/)** `^5.36.16` - Reactive UI framework with latest features
-- **[TypeScript](https://www.typescriptlang.org/)** `^5.8.3` - Type safety and enhanced DX
-- **[Vite](https://vitejs.dev/)** `^7.0.6` - Fast build tool and dev server
-
-### Styling & UI
-- **[Tailwind CSS](https://tailwindcss.com/)** `^3.4.17` - Utility-first CSS framework
-- **[PostCSS](https://postcss.org/)** `^8.5.6` - CSS post-processing
-- **[Lucide Svelte](https://lucide.dev/)** `^0.525.0` - Beautiful SVG icons
-- **[Tailwind Merge](https://github.com/dcastil/tailwind-merge)** `^3.3.1` - Conditional class merging
-- **[clsx](https://github.com/lukeed/clsx)** `^2.1.1` - Class name utility
-
-### Development Tools
-- **[ESLint](https://eslint.org/)** `^9.31.0` - Code linting
-- **[Prettier](https://prettier.io/)** `^3.6.2` - Code formatting
-- **[Svelte Check](https://github.com/sveltejs/language-tools)** `^4.3.0` - Type checking for Svelte
-
-### Package Manager
-- **[pnpm](https://pnpm.io/)** `10.13.1` - Fast, disk space efficient package manager
+- **Frontend Framework**: [SvelteKit](https://kit.svelte.dev/) v2.26.0
+- **Language**: [TypeScript](https://www.typescriptlang.org/) v5.8.3
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) v3.4.17
+- **Build Tool**: [Vite](https://vitejs.dev/) v7.0.6
+- **Package Manager**: [pnpm](https://pnpm.io/) v10.13.1
+- **Runtime**: Node.js v24+
 
 ## 📁 Project Structure
 
@@ -43,190 +19,260 @@ Modern, responsive web application built with SvelteKit and TypeScript featuring
 sinar-web-app/
 ├── src/
 │   ├── lib/
-│   │   ├── components/
-│   │   │   ├── auth/
-│   │   │   │   └── LoginForm.svelte       # Reusable login form component
-│   │   │   ├── layout/
-│   │   │   │   ├── AuthLayout.svelte      # Authentication pages layout
-│   │   │   │   ├── Footer.svelte          # App footer component
-│   │   │   │   ├── Header.svelte          # App header/navigation
-│   │   │   │   └── MainLayout.svelte      # Main app layout wrapper
-│   │   │   └── ui/
-│   │   │       ├── button.svelte          # Reusable button component
-│   │   │       ├── card.svelte            # Card container component
-│   │   │       ├── input.svelte           # Form input component
-│   │   │       └── label.svelte           # Form label component
-│   │   ├── index.ts                       # Component exports
-│   │   └── utils.ts                       # Utility functions
-│   ├── routes/
-│   │   ├── login/
-│   │   │   └── +page.svelte               # Login page
-│   │   ├── +layout.svelte                 # Root layout
-│   │   └── +page.svelte                   # Home page
-│   ├── app.css                            # Global styles with Tailwind
-│   ├── app.d.ts                           # TypeScript declarations
-│   └── app.html                           # HTML template
-├── static/
+│   │   ├── components/           # Reusable UI components
+│   │   │   ├── admin/           # Admin-specific components
+│   │   │   │   ├── categories/  # Category management
+│   │   │   │   ├── documents/   # Document management
+│   │   │   │   └── users/       # User management
+│   │   │   ├── auth/            # Authentication components
+│   │   │   ├── dashboard/       # Dashboard layout & widgets
+│   │   │   ├── layout/          # Layout components
+│   │   │   ├── ui/              # Base UI components
+│   │   │   └── user/            # User-specific components
+│   │   │       ├── categories/  # User category views
+│   │   │       ├── documents/   # User document views
+│   │   │       └── reports/     # User reports (coming soon)
+│   │   ├── services/            # API services
+│   │   │   ├── api/             # HTTP client configuration
+│   │   │   ├── auth/            # Authentication services
+│   │   │   ├── categories/      # Category services
+│   │   │   ├── documents/       # Document services
+│   │   │   └── users/           # User services
+│   │   ├── stores/              # Svelte stores for state management
+│   │   └── utils/               # Utility functions
+│   │       └── table/           # Table-related utilities
+│   ├── routes/                  # SvelteKit file-based routing
+│   │   ├── admin/               # Admin routes
+│   │   │   ├── categories/      # Category management pages
+│   │   │   ├── documents/       # Document management pages
+│   │   │   ├── master/          # Master data management
+│   │   │   └── users/           # User management pages
+│   │   ├── user/                # User routes
+│   │   │   ├── categories/      # User category views
+│   │   │   ├── documents/       # User document views
+│   │   │   └── reports/         # User reports
+│   │   ├── home/                # Home page
+│   │   └── login/               # Authentication
+│   ├── app.html                 # Main HTML template
+│   ├── app.css                  # Global styles & Tailwind imports
+│   ├── app.d.ts                 # Global type definitions
+│   └── vite-env.d.ts           # Vite environment types
+├── static/                      # Static assets
 │   ├── assets/
-│   │   └── logo.png                       # SINAR brand logo
-│   ├── favicon.png                        # Favicon (PNG fallback)
-│   └── favicon.svg                        # Favicon (SVG, scalable)
-├── .vscode/
-│   └── settings.json                      # VS Code TypeScript settings
-├── postcss.config.js                     # PostCSS configuration
-├── svelte.config.js                      # SvelteKit configuration
-├── tailwind.config.ts                    # Tailwind CSS configuration
-├── tsconfig.json                         # TypeScript configuration
-├── tsconfig.node.json                    # Node.js TypeScript config
-├── vite.config.ts                        # Vite build configuration
-└── package.json                          # Dependencies and scripts
+│   │   └── logo.png
+│   ├── favicon.png
+│   └── favicon.svg
+├── package.json                 # Dependencies & scripts
+├── vite.config.ts              # Vite configuration
+├── svelte.config.js            # SvelteKit configuration
+├── tailwind.config.ts          # Tailwind CSS configuration
+├── tsconfig.json               # TypeScript configuration
+└── postcss.config.js           # PostCSS configuration
 ```
 
-## 🎨 Design Features
+## ⚙️ Configuration
 
-### Glassmorphism UI
-- Semi-transparent components with backdrop blur effects
-- Multi-layer shadows for 3D depth perception
-- Interactive glass elements with hover states
+### Environment Variables
 
-### Interactive Lighting
-- Real-time mouse tracking light gradients
-- Dynamic dark overlay creating spotlight effect
-- Multiple gradient layers with different animation speeds
-- Smooth transitions with linear easing for responsiveness
+Create a `.env` file in the root directory:
 
-### Responsive Layout
-- Mobile-first design approach
-- Split-screen layout for desktop (form + branding)
-- Adaptive typography and spacing
-- Touch-friendly interactive elements
+```env
+# API Configuration
+VITE_API_BASE_URL=http://localhost:3000/api
+VITE_API_TIMEOUT=30000
 
-## 🚦 Getting Started
+# Development Server
+VITE_PORT=5173
+VITE_HOST=localhost
+
+# Application Info
+VITE_APP_NAME=SINAR Web Application
+VITE_APP_VERSION=1.0.0
+
+# Development Options
+VITE_ENABLE_DEBUG=false
+VITE_BUILD_TARGET=es2022
+VITE_SOURCEMAP=false
+```
+
+### Build Configuration
+
+- **Target**: ES2022 for modern browser support
+- **TypeScript**: Strict mode with comprehensive type checking
+- **Bundler**: Uses Vite's optimized bundling
+- **Path Aliases**: `@` points to `./src` directory
+
+## 🛠️ Development
 
 ### Prerequisites
-- Node.js 18.x or higher
-- pnpm (recommended) or npm
+
+- Node.js v24+
+- pnpm v10.13.1+
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd sinar-web-app
-   ```
+```bash
+# Clone the repository
+git clone <repository-url>
+cd sinar-web-app
 
-2. **Install dependencies**
-   ```bash
-   pnpm install
-   ```
+# Install dependencies
+pnpm install
+```
 
-3. **Start development server**
-   ```bash
-   pnpm dev
-   ```
+### Available Scripts
 
-4. **Open in browser**
-   ```
-   http://localhost:5173
-   ```
+```bash
+# Development server
+pnpm dev
 
-## 📝 Available Scripts
+# Production build
+pnpm build
 
-| Script | Description |
-|--------|-------------|
-| `pnpm dev` | Start development server with hot reload |
-| `pnpm build` | Build production-ready application |
-| `pnpm preview` | Preview production build locally |
-| `pnpm check` | Run Svelte type checking |
-| `pnpm check:watch` | Run type checking in watch mode |
-| `pnpm lint` | Lint code with ESLint |
-| `pnpm format` | Format code with Prettier |
+# Preview production build
+pnpm preview
 
-## 🏗️ Architecture
+# Type checking
+pnpm check
 
-### Component Philosophy
-- **Modular Design**: Each component has a single responsibility
-- **Reusability**: Components are designed to be used across different pages
-- **Type Safety**: Full TypeScript integration with proper interfaces
-- **Accessibility**: Semantic HTML and ARIA attributes
+# Type checking with watch mode
+pnpm check:watch
 
-### Layout System
-- **AuthLayout**: For authentication pages (login, register) with split-screen design
-- **MainLayout**: For main application pages with header/footer
-- **Flexible**: Easy to add new layout types for different page categories
+# Linting
+pnpm lint
 
-### State Management
-- **Svelte 5 Runes**: Using modern `$state()` and `$props()` syntax
-- **Component-level**: State managed at component level for simplicity
-- **Reactive**: Automatic UI updates with Svelte's reactivity
+# Code formatting
+pnpm format
+```
 
-## 🎯 Key Pages
+## 🏗️ Build & Deployment
 
-### Home Page (`/`)
-- Hero section with gradient background
-- Feature showcase with icons
-- Call-to-action buttons
-- Full MainLayout with header/footer
+### Production Build
 
-### Login Page (`/login`)
-- Glassmorphism card design
-- Interactive mouse-tracking lighting effects
-- Form validation and accessibility
-- Split-screen layout with SINAR branding
-- Responsive design for all devices
-
-## 🔧 Configuration
-
-### TypeScript
-- Strict mode enabled for enhanced type safety
-- Path aliases configured (`@/*` for `src/*`)
-- Svelte-specific type checking with svelte-check
-
-### Tailwind CSS
-- Custom color palette matching brand identity
-- CSS custom properties for dynamic theming
-- Responsive breakpoints optimized for modern devices
-- Typography and spacing scales
-
-### VS Code Integration
-- Automatic import suggestions
-- TypeScript IntelliSense optimization
-- Path mapping for better developer experience
-
-## 🚀 Deployment
-
-### Build for Production
 ```bash
 pnpm build
 ```
 
-### Preview Production Build
+The build output will be in the `.svelte-kit/output` directory.
+
+### Docker Deployment
+
+#### Build Docker Image
+
 ```bash
-pnpm preview
+docker build -t sinar-web-app .
 ```
 
-The application can be deployed to any static hosting service like:
-- Vercel (recommended for SvelteKit)
-- Netlify
-- GitHub Pages
-- Firebase Hosting
+#### Run with Docker Compose
 
-## 🤝 Contributing
+```bash
+docker-compose up -d
+```
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+The application will be available at `http://localhost:4173`.
+
+## 🔧 Features
+
+### Authentication
+- JWT-based authentication
+- Role-based access control (Admin/User)
+- Secure login/logout functionality
+
+### Admin Panel
+- **User Management**: CRUD operations for user accounts
+- **Document Management**: Upload, download, and organize documents
+- **Category Management**: Create and manage document categories
+- **Master Data**: Centralized data management
+
+### User Interface
+- **Document Browser**: View and download available documents
+- **Category Explorer**: Browse documents by categories
+- **Reports**: Analytics and insights (coming soon)
+
+### UI/UX
+- Responsive design with Tailwind CSS
+- Modern component library
+- Dark/light theme support
+- Toast notifications and modals
+- Loading states and error handling
+
+## 🎨 Styling
+
+### Tailwind CSS Setup
+- Custom design system with CSS variables
+- Semantic color tokens
+- Typography and spacing scales
+- Component variants and utilities
+
+### Design Tokens
+```css
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --secondary: 210 40% 96%;
+  /* ... more tokens */
+}
+```
+
+## 🔌 API Integration
+
+### HTTP Client
+- Axios-based HTTP client with interceptors
+- Automatic token management
+- Request/response transformation
+- Error handling
+
+### Services Structure
+- **AuthService**: Authentication operations
+- **UserService**: User management
+- **DocumentService**: Document operations
+- **CategoryService**: Category management
+
+## 📱 Responsive Design
+
+- Mobile-first approach
+- Breakpoint-based responsive components
+- Touch-friendly interactions
+- Optimized for tablets and desktops
+
+## 🧪 Development Tools
+
+### Code Quality
+- **ESLint**: Code linting with TypeScript rules
+- **Prettier**: Code formatting
+- **TypeScript**: Static type checking
+- **Svelte Check**: Svelte-specific type checking
+
+### Build Tools
+- **Vite**: Fast development and building
+- **PostCSS**: CSS processing with Autoprefixer
+- **Tailwind JIT**: Just-in-time CSS compilation
+
+## 🐳 Docker Configuration
+
+The application includes Docker support for containerized deployment:
+
+- **Dockerfile**: Multi-stage build for optimized production images
+- **docker-compose.yml**: Complete application stack
+- **.dockerignore**: Optimized build context
 
 ## 📄 License
 
 This project is licensed under the ISC License.
 
-## 🏢 About SINAR
+## 🤝 Contributing
 
-**SINAR (Sinergi Narasi)** - Building the future with modern web technologies. Clean, fast, and beautiful applications for everyone.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📞 Support
+
+For support and questions, please contact the development team.
 
 ---
 
-Built with ❤️ using SvelteKit, TypeScript, and Tailwind CSS
+Built with ❤️ using modern web technologies.
