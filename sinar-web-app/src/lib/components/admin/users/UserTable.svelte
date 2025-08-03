@@ -438,7 +438,6 @@
                     <div class="text-sm font-medium text-gray-900">
                       {user.username}
                     </div>
-                    <div class="text-sm text-gray-500">ID: {user.id}</div>
                   </div>
                 </div>
               </td>

@@ -506,6 +506,65 @@ class DocumentService {
       };
     }
   }
+
+  /**
+   * Preview document content as HTML (for .doc/.docx files)
+   */
+  async previewDocument(id: string | number): Promise<ApiResponse<string>> {
+    try {
+      const response = await httpClient.authenticatedRequest<any>(
+        `${this.baseEndpoint}/preview/${id}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/html, application/json'
+          }
+        }
+      );
+
+      console.log('Document service - preview response:', response);
+      
+      if (response.status) {
+        // If response is HTML string directly
+        if (typeof response.data === 'string') {
+          return {
+            status: true,
+            code: response.code || 200,
+            message: response.message || 'Document preview loaded successfully',
+            data: response.data,
+          };
+        }
+        
+        // If response has nested data structure
+        if (response.data && typeof response.data === 'object') {
+          const htmlContent = response.data.html || response.data.content || response.data;
+          if (typeof htmlContent === 'string') {
+            return {
+              status: true,
+              code: response.code || 200,
+              message: response.message || 'Document preview loaded successfully',
+              data: htmlContent,
+            };
+          }
+        }
+      }
+
+      return {
+        status: false,
+        code: response.code || 500,
+        message: response.message || 'Failed to preview document',
+        error: response.error || 'Failed to preview document',
+      };
+    } catch (error) {
+      console.error('Failed to preview document:', error);
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to preview document',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
 }
 
 // Export singleton instance

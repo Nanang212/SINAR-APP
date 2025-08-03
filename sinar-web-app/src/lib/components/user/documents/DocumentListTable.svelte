@@ -268,6 +268,138 @@
     }
   }
 
+  // Preview state
+  let isPreviewOpen = $state(false);
+  let previewContent = $state<string>('');
+  let previewTitle = $state<string>('');
+  let isLoadingPreview = $state(false);
+
+  async function handlePreview(doc: Document) {
+    try {
+      // Check if document is previewable (only .doc/.docx files)
+      const fileName = doc.original_name.toLowerCase();
+      if (!fileName.endsWith('.doc') && !fileName.endsWith('.docx')) {
+        modalToastStore.error('Preview is only available for Word documents (.doc/.docx)');
+        return;
+      }
+
+      isLoadingPreview = true;
+      const result = await documentService.previewDocument(doc.id);
+      
+      if (result.status && result.data) {
+        previewContent = cleanMammothHTML(result.data);
+        previewTitle = doc.title;
+        isPreviewOpen = true;
+      } else {
+        modalToastStore.error(result.message || 'Failed to preview document');
+      }
+    } catch (error) {
+      console.error('Preview failed:', error);
+      modalToastStore.error('Preview failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      isLoadingPreview = false;
+    }
+  }
+
+  function closePreview() {
+    isPreviewOpen = false;
+    previewContent = '';
+    previewTitle = '';
+  }
+
+  // Check if document can be previewed
+  function canPreview(fileName: string): boolean {
+    const name = fileName.toLowerCase();
+    return name.endsWith('.doc') || name.endsWith('.docx');
+  }
+
+  // Clean HTML from Mammoth for better Word-like rendering
+  function cleanMammothHTML(html: string): string {
+    if (!html) return html;
+    
+    try {
+      // Create a temporary div to manipulate HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      
+      // Remove problematic inline styles
+      const allElements = tempDiv.querySelectorAll('*');
+      allElements.forEach(element => {
+        try {
+          const style = element.getAttribute('style');
+          if (style) {
+            // Keep only essential styles, remove others
+            let cleanStyle = '';
+            
+            // Preserve text alignment
+            if (style.includes('text-align:')) {
+              const alignMatch = style.match(/text-align:\s*([^;]+)/);
+              if (alignMatch) {
+                cleanStyle += `text-align: ${alignMatch[1]};`;
+              }
+            }
+            
+            // Preserve bold/italic
+            if (style.includes('font-weight:') && (style.includes('bold') || style.includes('700'))) {
+              cleanStyle += 'font-weight: bold;';
+            }
+            if (style.includes('font-style:') && style.includes('italic')) {
+              cleanStyle += 'font-style: italic;';
+            }
+            
+            // Preserve text decoration (underline, etc.)
+            if (style.includes('text-decoration:')) {
+              const decorationMatch = style.match(/text-decoration:\s*([^;]+)/);
+              if (decorationMatch) {
+                cleanStyle += `text-decoration: ${decorationMatch[1]};`;
+              }
+            }
+            
+            // Preserve colors only if they're not default black
+            if (style.includes('color:') && !style.includes('color: rgb(0, 0, 0)') && !style.includes('color:#000') && !style.includes('color: #000')) {
+              const colorMatch = style.match(/color:\s*([^;]+)/);
+              if (colorMatch && colorMatch[1].trim() !== 'black') {
+                cleanStyle += `color: ${colorMatch[1]};`;
+              }
+            }
+            
+            // Set cleaned style or remove if empty
+            if (cleanStyle.trim()) {
+              element.setAttribute('style', cleanStyle);
+            } else {
+              element.removeAttribute('style');
+            }
+          }
+        } catch (err) {
+          console.warn('Error processing element style:', err);
+        }
+      });
+      
+      // Remove empty paragraphs that Mammoth sometimes creates
+      const allPs = tempDiv.querySelectorAll('p');
+      allPs.forEach(p => {
+        try {
+          // Remove if paragraph is completely empty (no text and no child elements)
+          const hasText = p.textContent?.trim();
+          const hasChildren = p.children.length > 0;
+          
+          if (!hasText && !hasChildren) {
+            p.remove();
+          }
+        } catch (err) {
+          console.warn('Error processing paragraph:', err);
+        }
+      });
+      
+      return tempDiv.innerHTML;
+      
+    } catch (error) {
+      console.error('Error cleaning Mammoth HTML:', error);
+      // Return original HTML if cleaning fails
+      return html;
+    }
+  }
+
   function formatDate(dateStr: string) {
     const date = new Date(dateStr);
     const day = date.getDate().toString().padStart(2, '0');
@@ -431,7 +563,32 @@
                 {formatDate(doc.uploaded_at)}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
+                <div class="flex items-center justify-center space-x-2" onclick={(e) => e.stopPropagation()}>
+                  <!-- Preview Button -->
+                  <div class="relative group">
+                    <button
+                      onclick={() => handlePreview(doc)}
+                      disabled={!canPreview(doc.original_name) || isLoadingPreview}
+                      class="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed {canPreview(doc.original_name) ? '' : 'opacity-50'}"
+                      aria-label="Preview document"
+                    >
+                      {#if isLoadingPreview}
+                        <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      {:else}
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      {/if}
+                    </button>
+                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                      {canPreview(doc.original_name) ? 'Preview' : 'Preview not available'}
+                    </div>
+                  </div>
+
+                  <!-- Download Button -->
                   <div class="relative group">
                     <button
                       onclick={() => handleDownload(doc)}
@@ -537,3 +694,262 @@
     </div>
   {/if}
 </div>
+
+<!-- Document Preview Modal -->
+{#if isPreviewOpen}
+  <!-- Add custom CSS for Word-like styling -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman:wght@400;700&display=swap');
+    
+    .document-content {
+      /* Page setup like A4 */
+      width: 21cm;
+      min-height: 29.7cm;
+      margin: 2cm auto;
+      padding: 2.54cm;
+      background: white;
+      box-shadow: 0 0 20px rgba(0,0,0,0.15);
+      
+      /* Document properties */
+      font-family: 'Times New Roman', 'Liberation Serif', serif;
+      font-size: 11pt;
+      line-height: 1.08;
+      color: #000000;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    .document-content h1,
+    .document-content h2,
+    .document-content h3,
+    .document-content h4,
+    .document-content h5,
+    .document-content h6 {
+      font-family: 'Times New Roman', 'Liberation Serif', serif !important;
+      font-weight: bold !important;
+      margin: 0 0 0 0 !important;
+      margin-bottom: 0.25em !important;
+      margin-top: 1em !important;
+      color: #000000 !important;
+      page-break-after: avoid !important;
+    }
+    
+    .document-content h1 { 
+      font-size: 18pt !important; 
+      margin-top: 0 !important;
+    }
+    .document-content h2 { font-size: 16pt !important; }
+    .document-content h3 { font-size: 14pt !important; }
+    .document-content h4 { font-size: 12pt !important; }
+    
+    .document-content p {
+      font-family: 'Times New Roman', 'Liberation Serif', serif !important;
+      font-size: 11pt !important;
+      line-height: 1.08 !important;
+      margin: 0 0 0 0 !important;
+      margin-bottom: 8pt !important;
+      text-align: left !important;
+      text-indent: 0 !important;
+      color: #000000 !important;
+      orphans: 2 !important;
+      widows: 2 !important;
+    }
+    
+    .document-content p.center,
+    .document-content p[align="center"] {
+      text-align: center !important;
+    }
+    
+    .document-content p.right,
+    .document-content p[align="right"] {
+      text-align: right !important;
+    }
+    
+    .document-content strong,
+    .document-content b {
+      font-weight: bold !important;
+    }
+    
+    .document-content em,
+    .document-content i {
+      font-style: italic !important;
+    }
+    
+    .document-content ul,
+    .document-content ol {
+      margin: 6pt 0 6pt 24pt !important;
+      padding: 0 !important;
+    }
+    
+    .document-content li {
+      font-family: 'Times New Roman', Times, serif !important;
+      font-size: 12pt !important;
+      line-height: 1.15 !important;
+      margin: 0 0 3pt 0 !important;
+    }
+    
+    .document-content table {
+      border-collapse: collapse !important;
+      width: 100% !important;
+      margin: 6pt 0 !important;
+    }
+    
+    .document-content td,
+    .document-content th {
+      border: 1px solid #000 !important;
+      padding: 3pt 6pt !important;
+      font-family: 'Times New Roman', Times, serif !important;
+      font-size: 12pt !important;
+      vertical-align: top !important;
+    }
+    
+    .document-content th {
+      background-color: #f0f0f0 !important;
+      font-weight: bold !important;
+    }
+    
+    .document-content img {
+      max-width: 100% !important;
+      height: auto !important;
+      display: block !important;
+      margin: 6pt 0 !important;
+    }
+    
+    .document-content blockquote {
+      margin: 6pt 24pt !important;
+      padding: 0 !important;
+      font-style: italic !important;
+    }
+    
+    /* Center alignment */
+    .document-content .center,
+    .document-content [style*="text-align: center"],
+    .document-content [align="center"] {
+      text-align: center !important;
+    }
+    
+    /* Right alignment */
+    .document-content .right,
+    .document-content [style*="text-align: right"],
+    .document-content [align="right"] {
+      text-align: right !important;
+    }
+    
+    /* Aggressive override for Mammoth HTML output */
+    .document-content *[style] {
+      font-family: 'Times New Roman', 'Liberation Serif', serif !important;
+    }
+    
+    .document-content span[style*="font-family"] {
+      font-family: 'Times New Roman', 'Liberation Serif', serif !important;
+    }
+    
+    .document-content div[style*="font-family"] {
+      font-family: 'Times New Roman', 'Liberation Serif', serif !important;
+    }
+    
+    .document-content p[style*="font-family"] {
+      font-family: 'Times New Roman', 'Liberation Serif', serif !important;
+    }
+    
+    /* Fix font sizes from Mammoth */
+    .document-content *[style*="font-size"] {
+      font-size: 11pt !important;
+    }
+    
+    .document-content h1[style*="font-size"] {
+      font-size: 18pt !important;
+    }
+    
+    .document-content h2[style*="font-size"] {
+      font-size: 16pt !important;
+    }
+    
+    .document-content h3[style*="font-size"] {
+      font-size: 14pt !important;
+    }
+    
+    /* Fix line heights from Mammoth */
+    .document-content *[style*="line-height"] {
+      line-height: 1.08 !important;
+    }
+    
+    /* Fix margins from Mammoth */
+    .document-content *[style*="margin"] {
+      margin-top: 0 !important;
+      margin-bottom: 8pt !important;
+    }
+    
+    .document-content h1[style*="margin"],
+    .document-content h2[style*="margin"],
+    .document-content h3[style*="margin"],
+    .document-content h4[style*="margin"] {
+      margin-top: 1em !important;
+      margin-bottom: 0.25em !important;
+    }
+    
+    /* Override any color styles */
+    .document-content *:not([style*="color: rgb"]) {
+      color: #000000 !important;
+    }
+    
+    /* Remove web-specific styling */
+    .document-content * {
+      max-width: none !important;
+      box-sizing: border-box !important;
+    }
+    
+    /* Fix list styling */
+    .document-content ul[style],
+    .document-content ol[style] {
+      margin-left: 24pt !important;
+      margin-bottom: 8pt !important;
+    }
+    
+    .document-content li[style] {
+      margin-bottom: 3pt !important;
+      font-size: 11pt !important;
+      line-height: 1.08 !important;
+    }
+  </style>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]" onclick={closePreview}>
+    <div class="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] mx-4 flex flex-col" onclick={(e) => e.stopPropagation()}>
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-4 border-b border-gray-200">
+        <div class="flex-1 min-w-0">
+          <h3 class="text-lg font-medium text-gray-900 truncate">
+            Preview: {previewTitle}
+          </h3>
+        </div>
+        <button
+          onclick={closePreview}
+          class="ml-4 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="Close preview"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Modal Content -->
+      <div class="flex-1 overflow-auto" style="background: #f5f5f5;">
+        <!-- A4 Document Paper with Word-like styling -->
+        <div class="document-content">
+          {@html previewContent}
+        </div>
+      </div>
+      
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end p-4 border-t border-gray-200">
+        <button
+          onclick={closePreview}
+          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
