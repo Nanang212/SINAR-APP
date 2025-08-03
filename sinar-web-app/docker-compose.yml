@@ -8,9 +8,8 @@ services:
     ports:
       - "127.0.0.1:5173:5173"
     env_file:
-      - .env.production  # Load from file
+      - .env
     environment:
-      # Override specific vars if needed
       - PORT=5173
       - HOST=0.0.0.0
       - ORIGIN=https://fe.sinerginarasi.site
