@@ -44,7 +44,7 @@ exports.findAllReports = async (params) => {
 
   const data = Array.isArray(result?.data) ? result.data : [];
 
-  // Format dan kelompokkan
+  // Format dan kelompokkan berdasarkan document_id
   const groupedByDocument = {};
 
   for (const report of data) {
@@ -96,9 +96,14 @@ exports.findAllReports = async (params) => {
     groupedByDocument[documentKey].reports[type].push(reportItem);
   }
 
+  // 🔢 Total berdasarkan jumlah dokumen unik (bukan total report)
+  const groupedArray = Object.values(groupedByDocument);
+  const totalDocuments = groupedArray.length;
+
   return {
     ...result,
-    data: Object.values(groupedByDocument),
+    total: totalDocuments,
+    data: groupedArray,
   };
 };
 
