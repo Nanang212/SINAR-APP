@@ -123,7 +123,63 @@ const uploadMediaToMinio = (
   ];
 };
 
+const conditionalUploadMedia = (
+  fields = ["video", "audio"],
+  subfolder = "report"
+) => {
+  const multerFields = upload.fields(
+    fields.map((f) => ({ name: f, maxCount: 1 }))
+  );
+
+  return [
+    multerFields,
+    async (req, res, next) => {
+      try {
+        req.uploadedFiles = [];
+
+        for (const field of fields) {
+          const file = req.files?.[field]?.[0];
+          if (!file) continue;
+
+          if (!allowedMediaTypes.includes(file.mimetype)) {
+            return res.status(400).json({
+              message: `Invalid media type for field "${field}". Only audio/video allowed.`,
+            });
+          }
+
+          const filename = file.originalname;
+          const objectName = subfolder ? `${subfolder}/${filename}` : filename;
+
+          await minioClient.putObject(
+            minio.bucketReport,
+            objectName,
+            file.buffer,
+            file.size,
+            { "Content-Type": file.mimetype }
+          );
+
+          req.uploadedFiles.push({
+            field,
+            type: file.mimetype.startsWith("video") ? "VIDEO" : "AUDIO",
+            filename: objectName,
+            originalName: file.originalname,
+            size: file.size, // ini juga penting buat validasi di controller
+          });
+        }
+
+        next();
+      } catch (err) {
+        console.error("Upload media to MinIO failed:", err);
+        return res
+          .status(500)
+          .json({ message: "Failed to upload media file to storage" });
+      }
+    },
+  ];
+};
+
 module.exports = {
   uploadToMinio,
   uploadMediaToMinio,
+  conditionalUploadMedia,
 };

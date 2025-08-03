@@ -16,6 +16,20 @@ async function deleteFile(objectPath) {
   }
 }
 
+async function deleteReportMedia(filePath) {
+  try {
+    if (!filePath) {
+      console.warn("⚠️ No file path provided to delete");
+      return;
+    }
+
+    await minioClient.removeObject(minio.bucketReport, filePath);
+    console.log(`✅ Report media deleted from MinIO: ${filePath}`);
+  } catch (error) {
+    console.error("❌ Failed to delete report media from MinIO:", error);
+  }
+}
+
 /**
  * Stream document file from 'document' bucket (DOC, PDF, etc.)
  */
@@ -150,4 +164,5 @@ module.exports = {
   deleteFile,
   streamDocument,
   streamMedia,
+  deleteReportMedia,
 };

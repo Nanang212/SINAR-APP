@@ -201,6 +201,18 @@ exports.deleteDocument = async (id, updatedBy) => {
       };
     }
 
+    if (existing.filename) {
+      try {
+        await deleteFile(existing.filename);
+        console.log(`✅ File deleted from MinIO: ${existing.filename}`);
+      } catch (err) {
+        console.error(
+          `❌ Failed to delete file from MinIO: ${existing.filename}`,
+          err
+        );
+      }
+    }
+
     const deleted = await prisma.document.update({
       where: { id },
       data: {

@@ -25,13 +25,13 @@ exports.createReport = async ({ data, user }) => {
     };
   }
 
-  // 2. Cek keberadaan dokumen
+  // 2. Cek dokumen
   const doc = await documentRepository.findDocumentById(+data.document_id);
   if (!doc) {
     throw { code: 404, message: "Document not found" };
   }
 
-  // 3. Cek akses berdasarkan kategori
+  // 3. Cek akses kategori
   if (user.role !== "admin" && doc.category_id !== user.category_id) {
     throw {
       code: 403,
@@ -48,7 +48,7 @@ exports.createReport = async ({ data, user }) => {
     };
   }
 
-  // 5. Simpan ke repository
+  // 5. Simpan ke DB
   return await documentReportRepository.createReport({
     data: {
       ...data,

@@ -8,45 +8,17 @@ const {
   successUpdate,
   successDelete,
 } = require("../utils/response");
-const { baseUrl } = require("../../config/dotenv");
 
 exports.getAllReports = async (req, res) => {
   try {
     const result = await documentReportService.getAllReports(req.query);
-    const host = `${baseUrl}`;
-    const reports = Array.isArray(result?.data) ? result.data : [];
-
-    const formatted = reports.map((report) => ({
-      id: report.id,
-      type: report.type,
-      content: report.content
-        ? `${host}/api/v1/admin/reports/download/${report.id}`
-        : null,
-      preview_url: report.content
-        ? `${host}/api/v1/admin/reports/preview/${report.id}`
-        : null,
-      original_name: report.original_name,
-      description: report.description,
-      is_downloaded: report.is_downloaded,
-      downloaded_at: report.downloaded_at,
-      created_at: report.created_at,
-      created_by: report.created_by,
-      updated_at: report.updated_at,
-      updated_by: report.updated_by,
-      document: report.document
-        ? {
-            ...report.document,
-            url: `${host}/api/v1/documents/download/${report.document.id}`,
-          }
-        : null,
-      user: report.user,
-    }));
 
     successList(res, "Successfully fetched reports", {
       ...result,
-      data: formatted,
+      data: result?.data || [],
     });
   } catch (err) {
+    console.error("getAllReports Error:", err);
     errorStatus(res, err.code || 500, err.message);
   }
 };
@@ -56,35 +28,9 @@ exports.getReportById = async (req, res) => {
     const report = await documentReportService.getReportById(+req.params.id);
     if (!report) return notFound(res, "Report not found");
 
-    const host = `${baseUrl}`;
-    const formatted = {
-      id: report.id,
-      type: report.type,
-      content: report.content
-        ? `${host}/api/v1/reports/download/${report.id}`
-        : null,
-      preview_url: report.content
-        ? `${host}/api/v1/admin/reports/preview/${report.id}`
-        : null,
-      original_name: report.original_name,
-      description: report.description,
-      is_downloaded: report.is_downloaded,
-      downloaded_at: report.downloaded_at,
-      created_at: report.created_at,
-      created_by: report.created_by,
-      updated_at: report.updated_at,
-      updated_by: report.updated_by,
-      document: report.document
-        ? {
-            ...report.document,
-            url: `${host}/api/v1/documents/download/${report.document.id}`,
-          }
-        : null,
-      user: report.user,
-    };
-
-    successList(res, "Report found", [formatted]);
+    successList(res, "Report found", [report]);
   } catch (err) {
+    console.error("getReportById Error:", err);
     errorStatus(res, err.code || 500, err.message);
   }
 };
@@ -92,12 +38,14 @@ exports.getReportById = async (req, res) => {
 exports.createReport = async (req, res) => {
   try {
     const files = req.uploadedFiles || [];
+    const createdReports = [];
 
-    // Validasi ukuran file tiap jenis
+    // ✅ Proses AUDIO / VIDEO dari file
     for (const file of files) {
       const isVideo = file.type === "VIDEO";
       const isAudio = file.type === "AUDIO";
 
+      // Validasi ukuran
       if (isVideo && file.size > 500 * 1024 * 1024) {
         return errorStatus(
           res,
@@ -113,11 +61,7 @@ exports.createReport = async (req, res) => {
           `Audio file ${file.originalName} exceeds 30MB limit`
         );
       }
-    }
 
-    const createdReports = [];
-
-    for (const file of files) {
       const data = {
         ...req.body,
         type: file.type,
@@ -134,27 +78,51 @@ exports.createReport = async (req, res) => {
         return errorStatus(res, result.code || 500, result.msg);
       }
 
-      const host = `${baseUrl}`;
-      const formatted = {
-        ...result.data,
-        content: result.data.content
-          ? `${host}/api/v1/admin/reports/download/${result.data.id}`
-          : null,
-        document: result.data.document
-          ? {
-              ...result.data.document,
-              url: `${host}/api/v1/documents/download/${result.data.document.id}`,
-            }
-          : null,
-      };
-
-      createdReports.push(formatted);
+      createdReports.push(result.data);
     }
 
-    successCreate(res, "Multiple reports created", createdReports);
+    // ✅ Proses LINK (dari field "link")
+    if (req.body.link) {
+      const result = await documentReportService.createReport({
+        data: {
+          ...req.body,
+          type: "LINK",
+          content: req.body.link,
+          original_name: null,
+        },
+        user: req.user,
+      });
+
+      if (!result.success) {
+        return errorStatus(res, result.code || 500, result.msg);
+      }
+
+      createdReports.push(result.data);
+    }
+
+    // ✅ Proses TEXT (dari field "text")
+    if (req.body.text) {
+      const result = await documentReportService.createReport({
+        data: {
+          ...req.body,
+          type: "TEXT",
+          content: req.body.text,
+          original_name: null,
+        },
+        user: req.user,
+      });
+
+      if (!result.success) {
+        return errorStatus(res, result.code || 500, result.msg);
+      }
+
+      createdReports.push(result.data);
+    }
+
+    return successCreate(res, "Reports created successfully", createdReports);
   } catch (err) {
     console.error("CreateReport Error:", err);
-    errorStatus(res, err.code || 500, err.message);
+    return errorStatus(res, err.code || 500, err.message);
   }
 };
 
@@ -163,7 +131,7 @@ exports.updateReport = async (req, res) => {
     const id = +req.params.id;
     const files = req.uploadedFiles || [];
 
-    // Validasi size untuk masing-masing file
+    // Validasi size
     for (const file of files) {
       if (file.type === "VIDEO" && file.size > 500 * 1024 * 1024) {
         return errorStatus(res, 400, "Video size exceeds 500MB limit");
@@ -173,47 +141,54 @@ exports.updateReport = async (req, res) => {
       }
     }
 
-    const results = [];
+    const updatedReports = [];
 
-    for (const file of files) {
-      const updatedData = {
-        content: file.filename,
-        original_name: file.originalName,
-        type: file.type,
+    if (files.length > 0) {
+      for (const file of files) {
+        const updatedData = {
+          content: file.filename,
+          original_name: file.originalName,
+          type: file.type,
+          description: req.body.description,
+        };
+
+        const result = await documentReportService.updateReport(
+          id,
+          updatedData,
+          req.user
+        );
+
+        if (!result.success) {
+          return errorStatus(res, result.code || 500, result.msg);
+        }
+
+        updatedReports.push(result.data);
+      }
+    } else {
+      // Update selain file (e.g. TEXT, LINK, atau hanya deskripsi)
+      const updateData = {
         description: req.body.description,
+        content: req.body.content || req.body.link || req.body.text || null,
+        type: req.body.type?.toUpperCase() || null,
       };
 
-      const updated = await documentReportService.updateReport(
+      const result = await documentReportService.updateReport(
         id,
-        updatedData,
+        updateData,
         req.user
       );
 
-      if (!updated.success) {
-        return errorStatus(res, updated.code || 500, updated.msg);
+      if (!result.success) {
+        return errorStatus(res, result.code || 500, result.msg);
       }
 
-      const host = `${baseUrl}`;
-      const formatted = {
-        ...updated.data,
-        content: updated.data.content
-          ? `${host}/api/v1/reports/download/${updated.data.id}`
-          : null,
-        document: updated.data.document
-          ? {
-              ...updated.data.document,
-              url: `${host}/api/v1/documents/download/${updated.data.document.id}`,
-            }
-          : null,
-      };
-
-      results.push(formatted);
+      updatedReports.push(result.data);
     }
 
-    successUpdate(res, "Reports updated", results);
+    return successUpdate(res, "Reports updated", updatedReports);
   } catch (err) {
     console.error("UpdateReport Error:", err);
-    errorStatus(res, err.code || 500, err.message);
+    return errorStatus(res, err.code || 500, err.message);
   }
 };
 
