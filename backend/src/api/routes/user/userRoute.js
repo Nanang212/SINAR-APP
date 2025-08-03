@@ -3,12 +3,14 @@ const router = express.Router();
 
 const userController = require("../../controllers/userController");
 const { verifyToken } = require("../../../middlewares/authMiddleware");
+const roleMiddleware = require("../../../middlewares/roleMiddleware");
 
 // URUTAN TEPAT agar tidak bentrok
 router.get("/", verifyToken, userController.getAllUsers);
 router.put(
   "/change-password",
   verifyToken,
+  roleMiddleware(["admin"]),
   userController.changePasswordByUser
 );
 router.get("/:id", verifyToken, userController.getUserById);
