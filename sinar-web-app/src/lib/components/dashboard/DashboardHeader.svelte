@@ -8,6 +8,7 @@
   let currentTime = $state("");
   let userName = $state("Admin");
   let userInitial = $state("A");
+  let userRoleId = $state<number | null>(null);
   let isLoggingOut = $state(false);
   let showLogoutOverlay = $state(false);
   let showProfileDropdown = $state(false);
@@ -33,12 +34,33 @@
           if (response.status && response.data) {
             userName = response.data.username;
             userInitial = response.data.username.charAt(0).toUpperCase();
+            
+            // Debug: Log user data to check structure
+            console.log('User data from API:', response.data);
+            
+            // Try multiple ways to get role_id
+            userRoleId = response.data.role_id || 
+                        response.data.role?.id || 
+                        response.data.roleId ||
+                        null;
+            
+            console.log('Extracted userRoleId:', userRoleId);
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
           // Fallback to localStorage data
           userName = currentUser.username;
           userInitial = currentUser.username.charAt(0).toUpperCase();
+          
+          console.log('Current user from localStorage:', currentUser);
+          
+          userRoleId = currentUser.role_id || 
+                      currentUser.role?.id || 
+                      currentUser.roleId ||
+                      currentUser.role ||
+                      null;
+          
+          console.log('Fallback userRoleId:', userRoleId);
         }
       }
     })();
@@ -248,27 +270,30 @@
                 </div>
 
                 <!-- Profile Actions -->
-                <button
-                  onclick={openChangePasswordModal}
-                  class="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
-                >
-                  <svg
-                    class="w-4 h-4 mr-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <!-- Change Password - Only for Admin (role_id = 1) -->
+                {#if userRoleId === 1 || userRoleId === "1" || (userRoleId === null && userName.toLowerCase().includes('admin'))}
+                  <button
+                    onclick={openChangePasswordModal}
+                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                    />
-                  </svg>
-                  Change Password
-                </button>
+                    <svg
+                      class="w-4 h-4 mr-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1721 9z"
+                      />
+                    </svg>
+                    Change Password
+                  </button>
 
-                <div class="border-t border-gray-100"></div>
+                  <div class="border-t border-gray-100"></div>
+                {/if}
 
                 <!-- Logout Button -->
                 <button

@@ -7,6 +7,7 @@
     type PaginationParams,
   } from "@/lib/services";
   import { modalToastStore } from '@/lib/stores/modal-toast';
+  import Loading from '$lib/components/ui/loading.svelte';
 
   interface Document {
     id: string;
@@ -94,17 +95,18 @@
     }
   }
 
-  // Fetch all documents from API for client-side filtering
+  // Fetch documents with server-side pagination
   async function fetchDocuments() {
-    console.log("Starting fetchDocuments for client-side filtering...");
+    console.log("Starting fetchDocuments for frontend filtering...");
     isLoading = true;
     error = null;
 
     try {
-      console.log("Calling documentService.getPaginatedDocuments() with large limit...");
+      // Fetch all documents for frontend filtering (use a large limit)
+      console.log("Calling documentService.getPaginatedDocuments() to fetch all documents...");
       const response = await documentService.getPaginatedDocuments({
         page: 1,
-        limit: 1000 // Get all documents for client-side filtering
+        limit: 1000 // Fetch all documents at once for frontend filtering
       });
       console.log("API Response:", response);
       
@@ -113,11 +115,13 @@
         console.log("PaginatedData:", paginatedData);
         
         if (paginatedData.data && Array.isArray(paginatedData.data)) {
-          console.log("Processing", paginatedData.data.length, "documents...");
+          console.log("Processing", paginatedData.data.length, "documents for frontend filtering...");
           apiDocuments = paginatedData.data; // Store original API documents
           documents = paginatedData.data.map(transformApiDocument);
           totalRecords = paginatedData.total || 0;
-          console.log("Transformed documents:", documents);
+          totalPages = paginatedData.totalPages || Math.ceil(totalRecords / pageSize);
+          currentPage = 1; // Reset to page 1 since we're doing frontend pagination
+          console.log("All documents loaded - Total:", totalRecords, "CurrentPage reset to:", currentPage);
           error = null; // Clear any previous errors
         } else {
           console.error("Invalid response format - paginatedData:", paginatedData);
@@ -125,12 +129,14 @@
           documents = [];
           apiDocuments = [];
           totalRecords = 0;
+          totalPages = 0;
         }
       } else {
         error = response.message || "Failed to fetch documents";
         documents = [];
         apiDocuments = [];
         totalRecords = 0;
+        totalPages = 0;
         console.warn(
           "API Error - Status:",
           response.status,
@@ -143,6 +149,7 @@
       documents = [];
       apiDocuments = [];
       totalRecords = 0;
+      totalPages = 0;
       console.error("Fetch Error:", err);
     } finally {
       isLoading = false;
@@ -196,39 +203,47 @@
 
   // Pagination state
   let totalRecords = $state(0);
+  let totalPages = $state(0);
 
-  // Client-side filtering and pagination
-  const filteredData = $derived(() => {
-    let filtered = documents;
-
-    // Apply search filter
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (doc) =>
-          doc.title.toLowerCase().includes(term) ||
-          doc.original_name.toLowerCase().includes(term) ||
-          doc.username_upload.toLowerCase().includes(term) ||
-          (doc.remark && doc.remark.toLowerCase().includes(term))
-      );
+  // Server-side pagination - no client-side filtering needed
+  // Frontend filtering based on search term
+  const filteredDocuments = $derived(() => {
+    if (!searchTerm || searchTerm.trim() === "") {
+      return documents;
     }
-
-    return filtered;
+    
+    const term = searchTerm.toLowerCase().trim();
+    return documents.filter(doc => 
+      doc.title.toLowerCase().includes(term) ||
+      doc.original_name.toLowerCase().includes(term) ||
+      doc.filename.toLowerCase().includes(term) ||
+      doc.username_upload.toLowerCase().includes(term)
+    );
   });
 
+  // Frontend pagination after filtering
   const paginatedData = $derived(() => {
+    const filtered = filteredDocuments();
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    return filteredData().slice(startIndex, endIndex);
+    return filtered.slice(startIndex, endIndex);
   });
 
-  const totalPages = $derived(() =>
-    Math.ceil(filteredData().length / pageSize)
-  );
+  // Recalculate pagination info based on filtered results
+  const filteredTotalRecords = $derived(() => filteredDocuments().length);
+  const filteredTotalPages = $derived(() => Math.ceil(filteredTotalRecords() / pageSize));
 
-  function handlePageChange(newPage: number) {
-    if (newPage >= 1 && newPage <= totalPages()) {
+  // Reset page to 1 when search term changes
+  $effect(() => {
+    if (searchTerm !== undefined) {
+      currentPage = 1;
+    }
+  });
+
+  async function handlePageChange(newPage: number) {
+    if (newPage >= 1 && newPage <= filteredTotalPages()) {
       currentPage = newPage;
+      // No need to fetch from server, pagination is handled frontend-only
     }
   }
 
@@ -413,7 +428,8 @@
   }
 </script>
 
-<div class="pl-6 pr-8 pb-6 pt-12">
+
+<div class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-8 sm:pt-12">
   <!-- Error State -->
   {#if error}
     <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
@@ -469,12 +485,13 @@
     </div>
   {:else}
     <!-- Data Table -->
-    <div class="mt-8 pr-4">
-      <table class="w-full divide-y divide-gray-200 border border-gray-200">
-        <thead class="bg-gray-50 sticky top-0 z-10">
+    <div class="flex-1 pr-0 sm:pr-4 overflow-auto">
+      <div class="mt-16 sm:mt-8">
+      <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
+        <thead class="bg-gray-50 sticky top-6 sm:top-2 z-10">
           <tr>
             <th
-              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[220px] sm:min-w-[180px]"
               onclick={() => handleSort("title")}
             >
               <div class="flex items-center space-x-1">
@@ -483,7 +500,7 @@
               </div>
             </th>
             <th
-              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[100px]"
               onclick={() => handleSort("username_upload")}
             >
               <div class="flex items-center space-x-1">
@@ -494,7 +511,7 @@
               </div>
             </th>
             <th
-              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[120px]"
               onclick={() => handleSort("is_downloaded")}
             >
               <div class="flex items-center space-x-1">
@@ -504,7 +521,7 @@
               </div>
             </th>
             <th
-              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200"
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]"
               onclick={() => handleSort("uploaded_at")}
             >
               <div class="flex items-center space-x-1">
@@ -513,7 +530,7 @@
               </div>
             </th>
             <th
-              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50"
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[130px] sm:min-w-[90px]"
             >
               Actions
             </th>
@@ -522,10 +539,10 @@
         <tbody class="bg-white divide-y divide-gray-200">
           {#each paginatedData() as doc (doc.id)}
             <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-200" onclick={() => handleRowClick(doc)}>
-              <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+              <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
                 <div class="flex items-center">
                   <svg
-                    class="h-8 w-8 {doc.iconColor} mr-3"
+                    class="h-6 w-6 sm:h-8 sm:w-8 {doc.iconColor} mr-2 sm:mr-3 flex-shrink-0"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -536,34 +553,35 @@
                     />
                     <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
                   </svg>
-                  <div>
-                    <div class="text-sm font-medium text-gray-900">
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium text-gray-900 truncate">
                       {doc.title}
                     </div>
-                    <div class="text-sm text-gray-500">{doc.original_name}</div>
-                    {#if doc.remark}
-                      <div class="text-xs text-gray-400 mt-1">{doc.remark}</div>
-                    {/if}
+                    <div class="text-xs sm:text-sm text-gray-500 truncate max-w-[150px] sm:max-w-xs" title={doc.original_name}>
+                      {doc.original_name}
+                    </div>
                   </div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
-                <div class="text-sm text-gray-900">{doc.username_upload}</div>
+              <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap border-r border-gray-200">
+                <div class="text-xs sm:text-sm text-gray-900">{doc.username_upload}</div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+              <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap border-r border-gray-200">
                 <span
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {doc.is_downloaded
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {doc.is_downloaded
                     ? 'bg-green-100 text-green-800'
                     : 'bg-gray-100 text-gray-800'}"
                 >
-                  {doc.is_downloaded ? "Downloaded" : "Not Downloaded"}
+                  <span class="hidden sm:inline">{doc.is_downloaded ? "Downloaded" : "Not Downloaded"}</span>
+                  <span class="sm:hidden">{doc.is_downloaded ? "Yes" : "No"}</span>
                 </span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 border-r border-gray-200">
-                {formatDate(doc.uploaded_at)}
+              <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 border-r border-gray-200">
+                <div class="hidden sm:block">{formatDate(doc.uploaded_at)}</div>
+                <div class="sm:hidden">{formatDate(doc.uploaded_at).split(' ')[0]}</div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div class="flex items-center justify-center space-x-2" onclick={(e) => e.stopPropagation()}>
+              <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
+                <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
                   <!-- Preview Button -->
                   <div class="relative group">
                     <button
@@ -572,21 +590,18 @@
                       class="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed {canPreview(doc.original_name) ? '' : 'opacity-50'}"
                       aria-label="Preview document"
                     >
-                      {#if isLoadingPreview}
-                        <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                      {:else}
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      {/if}
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
                     </button>
-                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-5">
                       {canPreview(doc.original_name) ? 'Preview' : 'Preview not available'}
                     </div>
                   </div>
+
+                  <!-- Divider -->
+                  <div class="h-6 w-px bg-gray-300"></div>
 
                   <!-- Download Button -->
                   <div class="relative group">
@@ -599,7 +614,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m5-7V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-1" />
                       </svg>
                     </button>
-                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-5">
                       Download
                     </div>
                   </div>
@@ -609,10 +624,11 @@
           {/each}
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- Empty State -->
-    {#if paginatedData().length === 0}
+    {#if paginatedData().length === 0 && !isLoading}
       <div class="text-center py-12">
         <svg
           class="mx-auto h-12 w-12 text-gray-400"
@@ -631,69 +647,106 @@
           No documents found
         </h3>
         <p class="mt-1 text-sm text-gray-500">
-          {searchTerm
-            ? "Try adjusting your search terms."
-            : "No documents available."}
+          No documents available on this page.
         </p>
       </div>
     {/if}
 
     <!-- Pagination -->
-    <div class="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 bg-white sticky bottom-0 z-10">
-      <div class="text-sm text-gray-700">
-        Showing <span class="font-medium">{Math.min((currentPage - 1) * pageSize + 1, filteredData().length)}</span>
-        to
-        <span class="font-medium"
-          >{Math.min(currentPage * pageSize, filteredData().length)}</span
-        >
-        of <span class="font-medium">{filteredData().length}</span> results
-        {#if searchTerm.trim()}
-          <span class="text-gray-500">(filtered from {totalRecords} total)</span>
-        {/if}
+    <div class="flex-shrink-0 flex flex-col sm:flex-row items-center justify-between mt-4 sm:mt-6 pt-4 border-t border-gray-200 bg-white gap-4 sm:gap-0">
+      <div class="text-xs sm:text-sm text-gray-700 order-2 sm:order-1">
+        <span class="hidden sm:inline">
+          Showing <span class="font-medium">{Math.min((currentPage - 1) * pageSize + 1, filteredTotalRecords())}</span>
+          to
+          <span class="font-medium"
+            >{Math.min(currentPage * pageSize, filteredTotalRecords())}</span
+          >
+          of <span class="font-medium">{filteredTotalRecords()}</span> results
+        </span>
+        <span class="sm:hidden">
+          {Math.min((currentPage - 1) * pageSize + 1, filteredTotalRecords())}-{Math.min(currentPage * pageSize, filteredTotalRecords())} of {filteredTotalRecords()}
+        </span>
       </div>
 
-      <div class="flex items-center space-x-2">
-        <button
-          onclick={() => handlePageChange(1)}
-          disabled={currentPage === 1}
-          class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          First
-        </button>
+      <div class="flex items-center space-x-1 sm:space-x-2 order-1 sm:order-2">
+        <!-- Desktop: Show all buttons -->
+        <div class="hidden sm:flex items-center space-x-2">
+          <button
+            onclick={() => handlePageChange(1)}
+            disabled={currentPage === 1}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            First
+          </button>
 
-        <button
-          onclick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Previous
-        </button>
+          <button
+            onclick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
 
-        <span
-          class="px-3 py-1 text-sm text-white bg-blue-600 border border-blue-600 rounded-md"
-        >
-          {currentPage} of {Math.max(1, totalPages())}
-        </span>
+          <span
+            class="px-3 py-1 text-sm text-white bg-blue-600 border border-blue-600 rounded-md"
+          >
+            {currentPage} of {Math.max(1, filteredTotalPages())}
+          </span>
 
-        <button
-          onclick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage >= totalPages()}
-          class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
+          <button
+            onclick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= filteredTotalPages()}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
 
-        <button
-          onclick={() => handlePageChange(totalPages())}
-          disabled={currentPage >= totalPages()}
-          class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Last
-        </button>
+          <button
+            onclick={() => handlePageChange(filteredTotalPages())}
+            disabled={currentPage >= filteredTotalPages()}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Last
+          </button>
+        </div>
+        
+        <!-- Mobile: Show compact buttons -->
+        <div class="flex sm:hidden items-center space-x-1">
+          <button
+            onclick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            class="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Previous page"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          <span class="px-3 py-1 text-sm text-white bg-blue-600 border border-blue-600 rounded-md min-w-[80px] text-center">
+            {currentPage}/{Math.max(1, filteredTotalPages())}
+          </span>
+
+          <button
+            onclick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= filteredTotalPages()}
+            class="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Next page"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   {/if}
 </div>
+
+<!-- Loading Overlay for Preview -->
+{#if isLoadingPreview}
+  <Loading overlay={true} text="Loading preview..." />
+{/if}
 
 <!-- Document Preview Modal -->
 {#if isPreviewOpen}

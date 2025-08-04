@@ -1,6 +1,50 @@
 import { httpClient, type ApiResponse } from '../api/http-client';
 
 // Report interfaces based on API response
+export interface ReportItem {
+  id: number;
+  type: 'TEXT' | 'LINK' | 'AUDIO' | 'VIDEO';
+  content: string;
+  original_name: string | null;
+  description: string | null;
+  is_downloaded: boolean;
+  downloaded_at: string | null;
+  created_at: string;
+  created_by: number;
+  updated_at: string;
+  updated_by: number;
+  user: {
+    id: number;
+    username: string;
+  };
+  download_url: string | null;
+  preview_url: string | null;
+}
+
+export interface ReportDocument {
+  document: {
+    id: number;
+    original_name: string;
+    url: string;
+  };
+  reports: {
+    TEXT?: ReportItem[];
+    LINK?: ReportItem[];
+    AUDIO?: ReportItem[];
+    VIDEO?: ReportItem[];
+  };
+}
+
+export interface ReportsGroupedResponse {
+  status: boolean;
+  code: number;
+  message: string;
+  total: number;
+  page: number;
+  data: ReportDocument[];
+}
+
+// Legacy interface for backward compatibility
 export interface Report {
   id: number;
   document_id: number;
@@ -11,6 +55,8 @@ export interface Report {
   audio_filename: string | null;
   video_original_name: string | null;
   audio_original_name: string | null;
+  link: string | null;
+  text: string | null;
   created_at: string;
   updated_at: string;
   document?: {
@@ -59,14 +105,25 @@ export interface PaginationParams {
 export interface CreateReportRequest {
   document_id: string;
   description?: string;
-  video?: File;
-  audio?: File;
+  video?: File[];
+  audio?: File[];
+  link?: string[];
+  text?: string[];
+}
+
+export interface CreateReportWithTypeRequest {
+  document_id: string;
+  description?: string;
+  file: File;
+  type: 'VIDEO' | 'AUDIO';
 }
 
 export interface UpdateReportRequest {
   description?: string;
-  video?: File;
-  audio?: File;
+  video?: File[];
+  audio?: File[];
+  link?: string[];
+  text?: string[];
 }
 
 class ReportService {
@@ -74,7 +131,7 @@ class ReportService {
   private readonly adminBaseEndpoint = '/api/v1/admin/reports';
 
   /**
-   * Get all reports
+   * Get all reports (user endpoint)
    */
   async getAllReports(): Promise<ApiResponse<Report[]>> {
     try {
@@ -93,6 +150,42 @@ class ReportService {
           code: response.code,
           message: response.message,
           data: Array.isArray(reports) ? reports : [],
+        };
+      }
+
+      return {
+        status: false,
+        code: response.code,
+        message: response.message || 'Failed to fetch reports',
+        error: response.error || 'Failed to fetch reports',
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to fetch reports',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get all reports (admin endpoint) - new grouped format
+   */
+  async getAllReportsAdmin(): Promise<ApiResponse<ReportDocument[]>> {
+    try {
+      const response = await httpClient.authenticatedRequest<ReportsGroupedResponse>(
+        this.adminBaseEndpoint
+      );
+
+      console.log('Report service admin - raw response:', response);
+      
+      if (response.status && response.data) {
+        return {
+          status: true,
+          code: response.code,
+          message: response.message,
+          data: response.data || [],
         };
       }
 
@@ -219,7 +312,7 @@ class ReportService {
   }
 
   /**
-   * Create new report with form data
+   * Create new report with form data (supports multiple files and links/texts)
    */
   async createReport(data: CreateReportRequest): Promise<ApiResponse<Report>> {
     try {
@@ -230,12 +323,32 @@ class ReportService {
         formData.append('description', data.description);
       }
       
-      if (data.video) {
-        formData.append('video', data.video);
+      // Handle multiple video files
+      if (data.video && data.video.length > 0) {
+        data.video.forEach((videoFile) => {
+          formData.append('video', videoFile);
+        });
       }
       
-      if (data.audio) {
-        formData.append('audio', data.audio);
+      // Handle multiple audio files
+      if (data.audio && data.audio.length > 0) {
+        data.audio.forEach((audioFile) => {
+          formData.append('audio', audioFile);
+        });
+      }
+      
+      // Handle multiple links
+      if (data.link && data.link.length > 0) {
+        data.link.forEach((linkText) => {
+          formData.append('link', linkText);
+        });
+      }
+      
+      // Handle multiple texts
+      if (data.text && data.text.length > 0) {
+        data.text.forEach((textContent) => {
+          formData.append('text', textContent);
+        });
       }
 
       const response = await httpClient.authenticatedRequest<ReportsResponse>(
@@ -324,7 +437,61 @@ class ReportService {
   }
 
   /**
-   * Update existing report
+   * Create new report with type field (alternative API format)
+   */
+  async createReportWithType(data: CreateReportWithTypeRequest): Promise<ApiResponse<Report>> {
+    try {
+      const formData = new FormData();
+      formData.append('document_id', data.document_id);
+      formData.append('type', data.type);
+      formData.append('file', data.file);
+      
+      if (data.description) {
+        formData.append('description', data.description);
+      }
+
+      const response = await httpClient.authenticatedRequest<ReportsResponse>(
+        this.adminBaseEndpoint,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      console.log('Report service - create with type response:', response);
+      
+      if (response.status && response.data) {
+        const report = response.data.data || response.data;
+        const singleReport = Array.isArray(report) ? report[0] : report;
+        
+        if (singleReport) {
+          return {
+            status: true,
+            code: response.code,
+            message: response.message,
+            data: singleReport,
+          };
+        }
+      }
+
+      return {
+        status: false,
+        code: response.code,
+        message: response.message || 'Failed to create report',
+        error: response.error || 'Failed to create report',
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to create report',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Update existing report (supports multiple files and links/texts)
    */
   async updateReport(id: string | number, data: UpdateReportRequest): Promise<ApiResponse<Report>> {
     try {
@@ -334,12 +501,32 @@ class ReportService {
         formData.append('description', data.description);
       }
       
-      if (data.video) {
-        formData.append('video', data.video);
+      // Handle multiple video files
+      if (data.video && data.video.length > 0) {
+        data.video.forEach((videoFile) => {
+          formData.append('video', videoFile);
+        });
       }
       
-      if (data.audio) {
-        formData.append('audio', data.audio);
+      // Handle multiple audio files
+      if (data.audio && data.audio.length > 0) {
+        data.audio.forEach((audioFile) => {
+          formData.append('audio', audioFile);
+        });
+      }
+      
+      // Handle multiple links
+      if (data.link && data.link.length > 0) {
+        data.link.forEach((linkText) => {
+          formData.append('link', linkText);
+        });
+      }
+      
+      // Handle multiple texts
+      if (data.text && data.text.length > 0) {
+        data.text.forEach((textContent) => {
+          formData.append('text', textContent);
+        });
       }
 
       const response = await httpClient.authenticatedRequest<ReportsResponse>(

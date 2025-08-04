@@ -22,9 +22,27 @@
   let isSubmitting = $state(false);
   let isFormDisabled = $state(false);
   
-  // Multiple file upload states
-  let selectedAudioFiles = $state<File[]>([]);
-  let selectedVideoFiles = $state<File[]>([]);
+  // Media items (notes is now separate media type)
+  interface MediaItem {
+    id: string;
+    type: 'audio' | 'video' | 'url' | 'notes';
+    file?: File;
+    url?: string;
+    text?: string; // for notes content
+    createdAt: Date;
+  }
+  
+  let mediaItems = $state<MediaItem[]>([]);
+  
+  // Modal/dropdown states
+  let showAddMediaDropdown = $state(false);
+  let showMediaForm = $state(false);
+  let currentMediaType = $state<'audio' | 'video' | 'url' | 'notes' | null>(null);
+  
+  // Form states for adding media
+  let selectedFile = $state<File | null>(null);
+  let urlInput = $state('http://');
+  let textInput = $state(''); // renamed from noteInput, now for notes content
   
   // Upload progress states
   let uploadProgress = $state<{
@@ -93,9 +111,9 @@
       return;
     }
 
-    // Validate at least one file is selected
-    if (selectedAudioFiles.length === 0 && selectedVideoFiles.length === 0) {
-      modalToastStore.error('Please select at least one audio or video file');
+    // Validate at least one media item is provided
+    if (mediaItems.length === 0) {
+      modalToastStore.error('Please add at least one media item');
       return;
     }
 
@@ -114,14 +132,14 @@
         return;
       } else {
         // Create new reports with sequential API calls
-        await handleMultipleFileUpload(selectedDocumentId, description);
+        await handleMultipleContentUpload(selectedDocumentId, description);
       }
     } catch (error) {
       console.error('Submit error:', error);
       modalToastStore.error('An unexpected error occurred');
-      isFormDisabled = false;
     } finally {
       isSubmitting = false;
+      isFormDisabled = false;
       uploadProgress = { current: 0, total: 0, currentFile: '' };
     }
 
@@ -132,24 +150,23 @@
     onSubmit?.(formData);
   }
 
-  async function handleMultipleFileUpload(documentId: string, description: string) {
-    const allFiles: Array<{file: File, type: 'audio' | 'video'}> = [];
-    
-    // Prepare all files with their types
-    selectedAudioFiles.forEach(file => allFiles.push({file, type: 'audio'}));
-    selectedVideoFiles.forEach(file => allFiles.push({file, type: 'video'}));
-
-    uploadProgress.total = allFiles.length;
+  async function handleMultipleContentUpload(documentId: string, description: string) {
+    uploadProgress.total = mediaItems.length;
     uploadProgress.current = 0;
 
     let successCount = 0;
-    let failedFiles: string[] = [];
+    let failedItems: string[] = [];
 
-    // Sequential upload of all files
-    for (let i = 0; i < allFiles.length; i++) {
-      const {file, type} = allFiles[i];
+    // Sequential upload of all media items
+    for (let i = 0; i < mediaItems.length; i++) {
+      const item = mediaItems[i];
       uploadProgress.current = i + 1;
-      uploadProgress.currentFile = file.name;
+      
+      const displayName = item.file ? item.file.name : 
+                         item.url ? item.url.substring(0, 30) + '...' : 
+                         item.text ? `Notes: ${item.text.substring(0, 30)}...` :
+                         `${item.type} item`;
+      uploadProgress.currentFile = displayName;
 
       try {
         const formData = new FormData();
@@ -157,48 +174,77 @@
         if (description) {
           formData.append('description', description);
         }
-        formData.append(type, file);
+        
+        // Add content based on type
+        if (item.file) {
+          formData.append(item.type, item.file);
+        } else if (item.url) {
+          formData.append('link', item.url);
+        } else if (item.text) {
+          formData.append('text', item.text);
+        }
 
-        console.log(`Uploading ${type} file ${i + 1}/${allFiles.length}: ${file.name}`);
+        console.log(`Uploading ${item.type} ${i + 1}/${mediaItems.length}: ${displayName}`);
         
         const result = await reportService.createReportWithFormData(formData);
         
         if (result.status) {
           successCount++;
-          console.log(`✅ Successfully uploaded: ${file.name}`);
+          console.log(`✅ Successfully uploaded: ${displayName}`);
         } else {
-          failedFiles.push(file.name);
-          console.error(`❌ Failed to upload: ${file.name} - ${result.message}`);
+          failedItems.push(displayName);
+          console.error(`❌ Failed to upload: ${displayName} - ${result.message}`);
+          
+          // Show specific error message immediately when create fails
+          modalToastStore.error(result.message || 'Failed to create report');
+          
+          // Re-enable form so user can fix the issue
+          isFormDisabled = false;
+          
+          // Stop the upload process on first failure
+          break;
         }
 
         // Small delay between uploads
         await new Promise(resolve => setTimeout(resolve, 500));
         
       } catch (error) {
-        failedFiles.push(file.name);
-        console.error(`❌ Error uploading ${file.name}:`, error);
+        failedItems.push(displayName);
+        console.error(`❌ Error uploading ${displayName}:`, error);
+        
+        // Show specific error message immediately
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        modalToastStore.error(errorMessage);
+        
+        // Re-enable form so user can fix the issue
+        isFormDisabled = false;
+        
+        // Stop the upload process on error
+        break;
       }
     }
 
     // Show final results
-    if (successCount > 0 && failedFiles.length === 0) {
-      modalToastStore.success(`All ${successCount} files uploaded successfully!`);
+    if (successCount > 0 && failedItems.length === 0) {
+      modalToastStore.success(`All ${successCount} items uploaded successfully!`);
       // Reset form on complete success
       handleReset();
-    } else if (successCount > 0 && failedFiles.length > 0) {
-      modalToastStore.error(`${successCount} files uploaded successfully, but ${failedFiles.length} failed: ${failedFiles.join(', ')}`);
-    } else {
-      modalToastStore.error(`All uploads failed. Files: ${failedFiles.join(', ')}`);
     }
+    // Don't show additional error messages as they were already shown immediately
   }
 
   function handleReset() {
     selectedDocumentId = '';
-    selectedAudioFiles = [];
-    selectedVideoFiles = [];
+    mediaItems = [];
     uploadProgress = { current: 0, total: 0, currentFile: '' };
     isDocumentDropdownOpen = false;
     isFormDisabled = false;
+    showAddMediaDropdown = false;
+    showMediaForm = false;
+    currentMediaType = null;
+    selectedFile = null;
+    urlInput = 'http://';
+    textInput = '';
     formRef?.reset();
     onReset?.();
   }
@@ -217,94 +263,118 @@
     }
   }
 
-  // Audio file functions
-  function handleAudioAreaClick() {
-    const fileInput = document.getElementById('audio') as HTMLInputElement;
-    fileInput?.click();
-  }
-
-  function handleAudioChange(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const files = input.files;
-    
-    if (files && files.length > 0) {
-      const validFiles: File[] = [];
-      const invalidFiles: string[] = [];
-      const allowedExtensions = ['.mp3', '.m4a', '.wav', '.aac'];
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileName = file.name.toLowerCase();
-        const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
-        
-        if (isValidType) {
-          validFiles.push(file);
-        } else {
-          invalidFiles.push(file.name);
-        }
-      }
-      
-      if (invalidFiles.length > 0) {
-        modalToastStore.error(`Invalid audio files: ${invalidFiles.join(', ')}. Only MP3, M4A, WAV, AAC are allowed.`);
-      }
-      
-      if (validFiles.length > 0) {
-        selectedAudioFiles = [...selectedAudioFiles, ...validFiles];
-        modalToastStore.success(`Added ${validFiles.length} audio file(s)`);
-      }
-      
-      // Reset input to allow selecting same files again
-      input.value = '';
+  // Media handling functions
+  function toggleAddMediaDropdown() {
+    showAddMediaDropdown = !showAddMediaDropdown;
+    if (!showAddMediaDropdown) {
+      showMediaForm = false;
+      currentMediaType = null;
     }
   }
 
-  function removeAudioFile(index: number) {
-    selectedAudioFiles = selectedAudioFiles.filter((_, i) => i !== index);
-  }
-
-  // Video file functions
-  function handleVideoAreaClick() {
-    const fileInput = document.getElementById('video') as HTMLInputElement;
-    fileInput?.click();
-  }
-
-  function handleVideoChange(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const files = input.files;
+  function selectMediaType(type: 'audio' | 'video' | 'url' | 'notes') {
+    currentMediaType = type;
+    showMediaForm = true;
+    showAddMediaDropdown = false;
     
-    if (files && files.length > 0) {
-      const validFiles: File[] = [];
-      const invalidFiles: string[] = [];
-      const allowedExtensions = ['.mp4', '.avi', '.mov', '.wmv', '.mkv'];
+    // Reset form
+    selectedFile = null;
+    urlInput = 'http://';
+    textInput = '';
+  }
+
+  function handleFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    
+    if (file && currentMediaType) {
+      const allowedExtensions = currentMediaType === 'audio' 
+        ? ['.mp3', '.m4a', '.wav', '.aac']
+        : ['.mp4', '.avi', '.mov', '.wmv', '.mkv'];
       
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileName = file.name.toLowerCase();
-        const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
-        
-        if (isValidType) {
-          validFiles.push(file);
-        } else {
-          invalidFiles.push(file.name);
-        }
+      const fileName = file.name.toLowerCase();
+      const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (isValidType) {
+        selectedFile = file;
+      } else {
+        modalToastStore.error(`Invalid ${currentMediaType} file. Allowed: ${allowedExtensions.join(', ')}`);
+        input.value = '';
       }
-      
-      if (invalidFiles.length > 0) {
-        modalToastStore.error(`Invalid video files: ${invalidFiles.join(', ')}. Only MP4, AVI, MOV, WMV, MKV are allowed.`);
-      }
-      
-      if (validFiles.length > 0) {
-        selectedVideoFiles = [...selectedVideoFiles, ...validFiles];
-        modalToastStore.success(`Added ${validFiles.length} video file(s)`);
-      }
-      
-      // Reset input to allow selecting same files again
-      input.value = '';
     }
   }
 
-  function removeVideoFile(index: number) {
-    selectedVideoFiles = selectedVideoFiles.filter((_, i) => i !== index);
+  function addMediaItem() {
+    if (!currentMediaType) return;
+
+    // Validation
+    if (currentMediaType === 'url') {
+      const trimmedUrl = urlInput.trim();
+      if (!trimmedUrl || trimmedUrl === 'http://' || trimmedUrl === 'https://') {
+        modalToastStore.error('Please enter a valid URL');
+        return;
+      }
+      
+      // Add URL media item
+      const newItem: MediaItem = {
+        id: Date.now().toString(),
+        type: 'url',
+        url: trimmedUrl,
+        createdAt: new Date()
+      };
+      
+      mediaItems = [...mediaItems, newItem];
+    } else if (currentMediaType === 'notes') {
+      const trimmedText = textInput.trim();
+      if (!trimmedText) {
+        modalToastStore.error('Please enter notes content');
+        return;
+      }
+      
+      // Add Notes media item
+      const newItem: MediaItem = {
+        id: Date.now().toString(),
+        type: 'notes',
+        text: trimmedText,
+        createdAt: new Date()
+      };
+      
+      mediaItems = [...mediaItems, newItem];
+    } else {
+      // Audio or Video file
+      if (!selectedFile) {
+        modalToastStore.error(`Please select a ${currentMediaType} file`);
+        return;
+      }
+      
+      const newItem: MediaItem = {
+        id: Date.now().toString(),
+        type: currentMediaType,
+        file: selectedFile,
+        createdAt: new Date()
+      };
+      
+      mediaItems = [...mediaItems, newItem];
+    }
+
+    // Reset form
+    showMediaForm = false;
+    currentMediaType = null;
+    selectedFile = null;
+    urlInput = 'http://';
+    textInput = '';
+  }
+
+  function removeMediaItem(id: string) {
+    mediaItems = mediaItems.filter(item => item.id !== id);
+  }
+
+  function cancelMediaForm() {
+    showMediaForm = false;
+    currentMediaType = null;
+    selectedFile = null;
+    urlInput = 'http://';
+    textInput = '';
   }
 
   function toggleDocumentDropdown() {
@@ -486,150 +556,305 @@
         ></textarea>
       </div>
 
-      <!-- Audio Upload -->
+      <!-- Media Upload Section -->
       <div>
-        <label for="audio" class="block text-sm font-medium text-gray-700 mb-2">
-          Audio Files (Multiple files allowed)
+        <label class="block text-sm font-medium text-gray-700 mb-4">
+          Media & Content
         </label>
         
-        <!-- Upload Area -->
-        <div 
-          class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors {isFormDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"
-          onclick={!isFormDisabled ? handleAudioAreaClick : undefined}
-        >
-          <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 3v10a1 1 0 001 1h8a1 1 0 001-1V7m-9 0h10M9 11v4m6-4v4"/>
-          </svg>
-          <p class="mt-2 text-sm text-gray-600">
-            <span class="font-medium text-blue-600 hover:text-blue-500">
-              Click to select audio files
-            </span>
-            or drag and drop
-          </p>
-          <p class="text-xs text-gray-500">MP3, M4A, WAV, AAC up to 50MB each</p>
-          <input 
-            type="file" 
-            id="audio" 
-            name="audio" 
-            class="hidden" 
-            accept=".mp3,.m4a,.wav,.aac"
-            multiple
+        <div class="relative">
+          <!-- Add Media Button -->
+          <button
+            type="button"
+            onclick={toggleAddMediaDropdown}
             disabled={isFormDisabled}
-            onchange={handleAudioChange}
-          />
-        </div>
-        
-        <!-- Selected Audio Files -->
-        {#if selectedAudioFiles.length > 0}
-          <div class="mt-4 space-y-2">
-            <p class="text-sm font-medium text-gray-700">Selected Audio Files ({selectedAudioFiles.length}):</p>
-            <div class="space-y-2">
-              {#each selectedAudioFiles as file, index (file.name + index)}
-                <div class="flex items-center justify-between p-2 bg-blue-50 rounded-md">
-                  <div class="flex items-center space-x-2">
-                    <svg class="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                    <span class="text-sm text-gray-900">{file.name}</span>
-                    <span class="text-xs text-gray-500">({Math.round(file.size / 1024 / 1024 * 100) / 100} MB)</span>
+            class="w-full px-4 py-3 text-base border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+          >
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <span class="text-gray-600 font-medium">Add Media</span>
+          </button>
+
+          <!-- Add Media Dropdown -->
+          {#if showAddMediaDropdown}
+            <div class="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+              <div class="p-2">
+                <button
+                  type="button"
+                  onclick={() => selectMediaType('audio')}
+                  class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                >
+                  <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">Audio File</div>
+                    <div class="text-xs text-gray-500">MP3, M4A, WAV, AAC</div>
                   </div>
-                  <button
-                    type="button"
-                    onclick={() => removeAudioFile(index)}
-                    disabled={isFormDisabled}
-                    class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                </button>
+                
+                <button
+                  type="button"
+                  onclick={() => selectMediaType('video')}
+                  class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                >
+                  <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">Video File</div>
+                    <div class="text-xs text-gray-500">MP4, AVI, MOV, WMV, MKV</div>
+                  </div>
+                </button>
+                
+                <button
+                  type="button"
+                  onclick={() => selectMediaType('url')}
+                  class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                >
+                  <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">URL Link</div>
+                    <div class="text-xs text-gray-500">Website or online resource</div>
+                  </div>
+                </button>
+                
+                <button
+                  type="button"
+                  onclick={() => selectMediaType('notes')}
+                  class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                >
+                  <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">Notes</div>
+                    <div class="text-xs text-gray-500">Text notes or observations</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Media Form Modal -->
+        {#if showMediaForm && currentMediaType}
+          <div class="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-medium text-gray-900 capitalize">
+                Add {currentMediaType} {currentMediaType === 'url' ? 'Link' : 'File'}
+              </h3>
+              <button
+                type="button"
+                onclick={cancelMediaForm}
+                class="text-gray-400 hover:text-gray-600"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="space-y-4">
+              {#if currentMediaType === 'url'}
+                <!-- URL Input -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    URL *
+                  </label>
+                  <input
+                    type="url"
+                    bind:value={urlInput}
+                    placeholder="https://example.com"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
                 </div>
-              {/each}
+              {:else if currentMediaType === 'notes'}
+                <!-- Notes Text Input -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Notes Content *
+                  </label>
+                  <textarea
+                    bind:value={textInput}
+                    rows="4"
+                    placeholder="Enter your notes, observations, or text content..."
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  ></textarea>
+                </div>
+              {:else}
+                <!-- File Input -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {currentMediaType === 'audio' ? 'Audio' : 'Video'} File *
+                  </label>
+                  <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
+                    <input
+                      type="file"
+                      accept={currentMediaType === 'audio' ? '.mp3,.m4a,.wav,.aac' : '.mp4,.avi,.mov,.wmv,.mkv'}
+                      onchange={handleFileSelect}
+                      class="hidden"
+                      id="mediaFileInput"
+                    />
+                    <label for="mediaFileInput" class="cursor-pointer">
+                      {#if selectedFile}
+                        <div class="flex items-center justify-center space-x-2">
+                          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span class="text-sm text-gray-900">{selectedFile.name}</span>
+                          <span class="text-xs text-gray-500">({Math.round(selectedFile.size / 1024 / 1024 * 100) / 100} MB)</span>
+                        </div>
+                      {:else}
+                        <div>
+                          <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <p class="mt-2 text-sm text-gray-600">
+                            Click to select {currentMediaType} file
+                          </p>
+                          <p class="text-xs text-gray-500">
+                            {currentMediaType === 'audio' ? 'MP3, M4A, WAV, AAC' : 'MP4, AVI, MOV, WMV, MKV'}
+                          </p>
+                        </div>
+                      {/if}
+                    </label>
+                  </div>
+                </div>
+              {/if}
+
+              <!-- Form Actions -->
+              <div class="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onclick={cancelMediaForm}
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onclick={addMediaItem}
+                  class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                >
+                  Add {currentMediaType === 'url' ? 'Link' : currentMediaType === 'notes' ? 'Notes' : 'File'}
+                </button>
+              </div>
             </div>
           </div>
         {/if}
-      </div>
 
-      <!-- Video Upload -->
-      <div>
-        <label for="video" class="block text-sm font-medium text-gray-700 mb-2">
-          Video Files (Multiple files allowed)
-        </label>
-        
-        <!-- Upload Area -->
-        <div 
-          class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors {isFormDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"
-          onclick={!isFormDisabled ? handleVideoAreaClick : undefined}
-        >
-          <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-          </svg>
-          <p class="mt-2 text-sm text-gray-600">
-            <span class="font-medium text-blue-600 hover:text-blue-500">
-              Click to select video files
-            </span>
-            or drag and drop
-          </p>
-          <p class="text-xs text-gray-500">MP4, AVI, MOV, WMV, MKV up to 100MB each</p>
-          <input 
-            type="file" 
-            id="video" 
-            name="video" 
-            class="hidden" 
-            accept=".mp4,.avi,.mov,.wmv,.mkv"
-            multiple
-            disabled={isFormDisabled}
-            onchange={handleVideoChange}
-          />
-        </div>
-        
-        <!-- Selected Video Files -->
-        {#if selectedVideoFiles.length > 0}
-          <div class="mt-4 space-y-2">
-            <p class="text-sm font-medium text-gray-700">Selected Video Files ({selectedVideoFiles.length}):</p>
-            <div class="space-y-2">
-              {#each selectedVideoFiles as file, index (file.name + index)}
-                <div class="flex items-center justify-between p-2 bg-green-50 rounded-md">
-                  <div class="flex items-center space-x-2">
-                    <svg class="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                    <span class="text-sm text-gray-900">{file.name}</span>
-                    <span class="text-xs text-gray-500">({Math.round(file.size / 1024 / 1024 * 100) / 100} MB)</span>
-                  </div>
-                  <button
-                    type="button"
-                    onclick={() => removeVideoFile(index)}
-                    disabled={isFormDisabled}
-                    class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              {/each}
+        <!-- Media Items Table -->
+        {#if mediaItems.length > 0}
+          <div class="mt-6">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Added Media Items ({mediaItems.length})</h4>
+            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  {#each mediaItems as item (item.id)}
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="flex items-center">
+                          {#if item.type === 'audio'}
+                            <div class="flex items-center space-x-2">
+                              <div class="w-2 h-2 bg-blue-600 rounded-full"></div>
+                              <span class="text-xs font-medium text-blue-600 uppercase">Audio</span>
+                            </div>
+                          {:else if item.type === 'video'}
+                            <div class="flex items-center space-x-2">
+                              <div class="w-2 h-2 bg-green-600 rounded-full"></div>
+                              <span class="text-xs font-medium text-green-600 uppercase">Video</span>
+                            </div>
+                          {:else if item.type === 'url'}
+                            <div class="flex items-center space-x-2">
+                              <div class="w-2 h-2 bg-purple-600 rounded-full"></div>
+                              <span class="text-xs font-medium text-purple-600 uppercase">URL</span>
+                            </div>
+                          {:else if item.type === 'notes'}
+                            <div class="flex items-center space-x-2">
+                              <div class="w-2 h-2 bg-amber-600 rounded-full"></div>
+                              <span class="text-xs font-medium text-amber-600 uppercase">Notes</span>
+                            </div>
+                          {/if}
+                        </div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="text-sm text-gray-900">
+                          {#if item.file}
+                            <div class="flex items-center space-x-2">
+                              <span class="truncate max-w-[200px]" title={item.file.name}>{item.file.name}</span>
+                              <span class="text-xs text-gray-500">({Math.round(item.file.size / 1024 / 1024 * 100) / 100} MB)</span>
+                            </div>
+                          {:else if item.url}
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline truncate max-w-[200px] block" title={item.url}>
+                              {item.url.length > 40 ? item.url.substring(0, 40) + '...' : item.url}
+                            </a>
+                          {:else if item.text}
+                            <div class="text-sm text-gray-900">
+                              <span class="truncate max-w-[200px] block" title={item.text}>
+                                {item.text.length > 50 ? item.text.substring(0, 50) + '...' : item.text}
+                              </span>
+                            </div>
+                          {/if}
+                        </div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="text-sm text-gray-600">
+                          {#if item.type === 'notes'}
+                            <span class="text-gray-400 italic">Text Content</span>
+                          {:else}
+                            <span class="text-gray-400 italic">Media File</span>
+                          {/if}
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onclick={() => removeMediaItem(item.id)}
+                          disabled={isFormDisabled}
+                          class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                          title="Remove item"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
             </div>
           </div>
         {/if}
-      </div>
 
-      <!-- File Selection Summary -->
-      {#if selectedAudioFiles.length > 0 || selectedVideoFiles.length > 0}
-        <div class="text-sm text-green-600 flex items-center space-x-1">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-          </svg>
-          <span>Ready to create report with {selectedAudioFiles.length + selectedVideoFiles.length} file(s)</span>
-        </div>
-      {:else if selectedDocumentId !== ''}
-        <div class="text-sm text-amber-600 flex items-center space-x-1">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-          </svg>
-          <span>Please select at least one audio or video file</span>
-        </div>
-      {/if}
+        <!-- Summary -->
+        {#if mediaItems.length > 0}
+          <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div class="text-sm text-green-700 font-medium">
+              Ready to upload {mediaItems.length} media item(s)
+            </div>
+          </div>
+        {:else if selectedDocumentId !== ''}
+          <div class="mt-4 text-sm text-amber-600 flex items-center space-x-1">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+            <span>Please add at least one media item</span>
+          </div>
+        {/if}
+      </div>
 
       <!-- Form Actions -->
       <div class="flex items-center justify-end space-x-4 pt-4">
@@ -643,7 +868,7 @@
         </button>
         <button
           type="submit"
-          disabled={isSubmitting || selectedDocumentId === '' || (selectedAudioFiles.length === 0 && selectedVideoFiles.length === 0)}
+          disabled={isSubmitting || selectedDocumentId === '' || mediaItems.length === 0}
           class="px-6 py-3 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
         >
           {#if isSubmitting}
