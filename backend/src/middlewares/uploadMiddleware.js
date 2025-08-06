@@ -21,6 +21,11 @@ const allowedMediaTypes = [
   "video/mpeg", // .mpeg
 ];
 
+const allowedImageTypes = [
+  "image/jpeg", // .jpg, .jpeg
+  "image/png", // .png
+];
+
 const uploadToMinio = (fieldName) => {
   return [
     upload.single(fieldName),
@@ -178,8 +183,55 @@ const conditionalUploadMedia = (
   ];
 };
 
+// 🖼️ Upload logo untuk user (JPG/PNG)
+const uploadLogoToMinio = (fieldName = "logo", subfolder = "logo-mentri") => {
+  return [
+    upload.single(fieldName),
+    async (req, res, next) => {
+      try {
+        // Skip jika tidak ada file upload
+        if (!req.file) return next();
+
+        // 🔒 Validasi tipe file image
+        if (!allowedImageTypes.includes(req.file.mimetype)) {
+          return res.status(400).json({
+            message: "Invalid file type. Only JPG and PNG images are allowed.",
+          });
+        }
+
+        const extension = path.extname(req.file.originalname);
+        const filename = `${uuidv4()}${extension}`;
+        const objectName = subfolder ? `${subfolder}/${filename}` : filename;
+
+        await minioClient.putObject(
+          minio.bucketDocument,
+          objectName,
+          req.file.buffer,
+          req.file.size,
+          {
+            "Content-Type": req.file.mimetype,
+          }
+        );
+
+        // Set data file untuk controller
+        req.file.path = objectName;
+        req.minioFilename = filename;
+        req.originalFileName = req.file.originalname;
+
+        next();
+      } catch (err) {
+        console.error("Upload logo to MinIO failed:", err);
+        return res
+          .status(500)
+          .json({ message: "Failed to upload logo to storage" });
+      }
+    },
+  ];
+};
+
 module.exports = {
   uploadToMinio,
   uploadMediaToMinio,
   conditionalUploadMedia,
+  uploadLogoToMinio,
 };

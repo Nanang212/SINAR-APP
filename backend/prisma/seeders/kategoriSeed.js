@@ -3,9 +3,13 @@ const prisma = new PrismaClient();
 
 async function main() {
   const categories = [
-    "Kementerian Keuangan",
-    "Kementerian Perhubungan",
-    "Kementerian Pendidikan",
+    "kementrian komunikasi dan digital",
+    "kementrian keuangan",
+    "sekretaris jenderal DPR",
+    "kementrian ketenagakerjaan",
+    "badan gizi nasional",
+    "televisi republik indonesia",
+    "radio republik indonesia",
   ];
 
   for (const name of categories) {

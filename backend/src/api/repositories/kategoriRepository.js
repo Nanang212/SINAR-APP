@@ -22,6 +22,7 @@ exports.findAllKategori = async (params) => {
       updated_at: true,
       updated_by: true,
     },
+    searchFields: ['name'],
   });
 };
 

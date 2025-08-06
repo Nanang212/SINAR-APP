@@ -45,6 +45,9 @@ exports.getAllDocuments = async (req, res) => {
       total: result.total,
       page: result.page,
       limit: result.limit,
+      totalPages: result.totalPages,
+      hasNext: result.hasNext,
+      hasPrev: result.hasPrev,
       data: formattedData,
     });
   } catch (err) {

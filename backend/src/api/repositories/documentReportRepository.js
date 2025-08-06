@@ -40,6 +40,7 @@ exports.findAllReports = async (params) => {
         },
       },
     },
+    searchFields: ['description', 'original_name'],
   });
 
   const data = Array.isArray(result?.data) ? result.data : [];

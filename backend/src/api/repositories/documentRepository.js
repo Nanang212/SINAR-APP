@@ -38,6 +38,7 @@ exports.findAllDocuments = async (params) => {
         },
       },
     },
+    searchFields: ['title', 'original_name'],
   });
 };
 

@@ -160,9 +160,44 @@ const streamMedia = async (objectName, req, res) => {
   }
 };
 
+/**
+ * Stream user logo file from 'document' bucket (images)
+ */
+const streamUserLogo = async (objectName, req, res) => {
+  try {
+    const bucket = minio.bucketDocument; // User logos are stored in document bucket
+    const ext = path.extname(objectName).toLowerCase();
+    const mimeType = mime.lookup(objectName) || "application/octet-stream";
+
+    // Check if it's an image file
+    if (!['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'].includes(ext)) {
+      return res.status(400).json({
+        status: false,
+        message: "File is not a valid image format",
+      });
+    }
+
+    // Set appropriate headers for image preview
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${objectName}"`);
+    res.setHeader("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
+
+    const stream = await minioClient.getObject(bucket, objectName);
+    stream.pipe(res);
+
+  } catch (error) {
+    console.error("❌ Failed to stream user logo:", error);
+    res.status(500).json({
+      status: false,
+      message: "Failed to preview user logo",
+    });
+  }
+};
+
 module.exports = {
   deleteFile,
   streamDocument,
   streamMedia,
+  streamUserLogo,
   deleteReportMedia,
 };

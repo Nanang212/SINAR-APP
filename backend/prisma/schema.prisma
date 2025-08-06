@@ -11,6 +11,10 @@ model User {
   id              Int              @id @default(autoincrement())
   password        String
   category_id     Int?
+  name_mentri     String?
+  contact_person  String?
+  filepath        String?
+  original_name   String?
   created_at      DateTime         @default(now())
   created_by      Int?
   is_active       Boolean          @default(true)

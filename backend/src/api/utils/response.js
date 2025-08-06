@@ -18,7 +18,7 @@ exports.successList = (res, message, data = []) => {
       message,
       total: data.total || 0,
       page: data.page || 1,
-      // limit: data.limit || 0,
+      limit: data.limit || 0,
       data: data.data || [],
     });
   }
