@@ -27,6 +27,7 @@
     onRefresh?: () => void;
     onRowClick?: (document: ApiDocument) => void;
     searchTerm?: string;
+    sortOrder?: 'asc' | 'desc';
   }
 
   let {
@@ -34,6 +35,7 @@
     onRefresh,
     onRowClick,
     searchTerm = "",
+    sortOrder = 'desc',
   }: $$Props = $props();
 
   // Component state
@@ -95,19 +97,23 @@
     }
   }
 
-  // Fetch documents with server-side pagination
-  async function fetchDocuments() {
-    console.log("Starting fetchDocuments for frontend filtering...");
+  // Fetch documents with server-side pagination, search and sort
+  async function fetchDocuments(page: number = 1, search: string = '', order: 'asc' | 'desc' = 'desc') {
+    console.log(`Starting fetchDocuments with pagination - Page: ${page}, Search: "${search}", Order: ${order}`);
     isLoading = true;
     error = null;
 
     try {
-      // Fetch all documents for frontend filtering (use a large limit)
-      console.log("Calling documentService.getPaginatedDocuments() to fetch all documents...");
-      const response = await documentService.getPaginatedDocuments({
-        page: 1,
-        limit: 1000 // Fetch all documents at once for frontend filtering
-      });
+      // Use backend pagination with search and sort
+      console.log("Calling documentService.getPaginatedDocuments() with backend pagination, search and sort...");
+      const params: PaginationParams = {
+        page: page,
+        limit: pageSize,
+        search: search,
+        order: order,
+      };
+      
+      const response = await documentService.getPaginatedDocuments(params);
       console.log("API Response:", response);
       
       if (response.status === true && response.data) {
@@ -115,13 +121,13 @@
         console.log("PaginatedData:", paginatedData);
         
         if (paginatedData.data && Array.isArray(paginatedData.data)) {
-          console.log("Processing", paginatedData.data.length, "documents for frontend filtering...");
+          console.log("Processing", paginatedData.data.length, "documents with backend pagination, search and sort...");
           apiDocuments = paginatedData.data; // Store original API documents
           documents = paginatedData.data.map(transformApiDocument);
           totalRecords = paginatedData.total || 0;
           totalPages = paginatedData.totalPages || Math.ceil(totalRecords / pageSize);
-          currentPage = 1; // Reset to page 1 since we're doing frontend pagination
-          console.log("All documents loaded - Total:", totalRecords, "CurrentPage reset to:", currentPage);
+          currentPage = page; // Set to requested page
+          console.log("Documents loaded - Total:", totalRecords, "Current Page:", currentPage, "Total Pages:", totalPages);
           error = null; // Clear any previous errors
         } else {
           console.error("Invalid response format - paginatedData:", paginatedData);
@@ -159,14 +165,14 @@
 
   // Handle refresh
   async function handleRefresh() {
-    await fetchDocuments();
+    await fetchDocuments(currentPage, searchTerm, sortOrder);
     onRefresh?.();
   }
 
   // Fetch on mount if required
   onMount(() => {
     if (fetchOnMount) {
-      fetchDocuments();
+      fetchDocuments(1, searchTerm, sortOrder);
     }
 
     // Add window focus listener to refresh data after download
@@ -174,7 +180,7 @@
       if (pendingDownloadRefresh) {
         console.log('Window regained focus, refreshing document data after download...');
         pendingDownloadRefresh = false;
-        await fetchDocuments();
+        await fetchDocuments(currentPage, searchTerm, sortOrder);
       }
     };
 
@@ -187,12 +193,13 @@
 
   // Public method to fetch documents (called from parent)
   export function loadDocuments() {
-    return fetchDocuments();
+    return fetchDocuments(1, searchTerm, sortOrder);
   }
 
-  // Public method to set search term (called from parent)
-  export function setSearchTerm(term: string) {
-    // Search is handled by parent through searchTerm prop
+  // Public method to set search parameters (called from parent)
+  export function setSearchParams(search: string, order: 'asc' | 'desc') {
+    currentPage = 1; // Reset to page 1 when search/sort changes
+    fetchDocuments(1, search, order);
   }
 
   // Table state
@@ -205,61 +212,23 @@
   let totalRecords = $state(0);
   let totalPages = $state(0);
 
-  // Server-side pagination - no client-side filtering needed
-  // Frontend filtering based on search term
-  const filteredDocuments = $derived(() => {
-    if (!searchTerm || searchTerm.trim() === "") {
-      return documents;
-    }
-    
-    const term = searchTerm.toLowerCase().trim();
-    return documents.filter(doc => 
-      doc.title.toLowerCase().includes(term) ||
-      doc.original_name.toLowerCase().includes(term) ||
-      doc.filename.toLowerCase().includes(term) ||
-      doc.username_upload.toLowerCase().includes(term)
-    );
-  });
+  // Backend handles search and sorting - no frontend filtering needed
+  // Documents are already filtered and sorted by backend
+  const paginatedData = $derived(() => documents);
 
-  // Frontend pagination after filtering
-  const paginatedData = $derived(() => {
-    const filtered = filteredDocuments();
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return filtered.slice(startIndex, endIndex);
-  });
+  // Use backend pagination info for pagination controls
+  const filteredTotalRecords = $derived(() => totalRecords);
+  const filteredTotalPages = $derived(() => totalPages);
 
-  // Recalculate pagination info based on filtered results
-  const filteredTotalRecords = $derived(() => filteredDocuments().length);
-  const filteredTotalPages = $derived(() => Math.ceil(filteredTotalRecords() / pageSize));
-
-  // Reset page to 1 when search term changes
-  $effect(() => {
-    if (searchTerm !== undefined) {
-      currentPage = 1;
-    }
-  });
+  // No automatic effect - let parent handle search/sort changes via setSearchParams
 
   async function handlePageChange(newPage: number) {
     if (newPage >= 1 && newPage <= filteredTotalPages()) {
-      currentPage = newPage;
-      // No need to fetch from server, pagination is handled frontend-only
+      await fetchDocuments(newPage, searchTerm, sortOrder);
     }
   }
 
-  function handleSort(field: keyof Document) {
-    if (sortField === field) {
-      sortDirection = sortDirection === "asc" ? "desc" : "asc";
-    } else {
-      sortField = field;
-      sortDirection = "asc";
-    }
-  }
-
-  function getSortIcon(field: keyof Document) {
-    if (sortField !== field) return "↕";
-    return sortDirection === "asc" ? "↑" : "↓";
-  }
+  // Sort functions removed - now handled by backend with dropdown
 
   function handleRowClick(doc: Document) {
     // Find the corresponding API document
@@ -491,43 +460,24 @@
         <thead class="bg-gray-50 sticky top-6 sm:top-2 z-10">
           <tr>
             <th
-              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[220px] sm:min-w-[180px]"
-              onclick={() => handleSort("title")}
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[220px] sm:min-w-[180px]"
             >
-              <div class="flex items-center space-x-1">
-                <span>Document</span>
-                <span class="text-gray-400">{getSortIcon("title")}</span>
-              </div>
+              Document
             </th>
             <th
-              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[100px]"
-              onclick={() => handleSort("username_upload")}
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[100px]"
             >
-              <div class="flex items-center space-x-1">
-                <span>Uploaded By</span>
-                <span class="text-gray-400"
-                  >{getSortIcon("username_upload")}</span
-                >
-              </div>
+              Uploaded By
             </th>
             <th
-              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[120px]"
-              onclick={() => handleSort("is_downloaded")}
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[120px]"
             >
-              <div class="flex items-center space-x-1">
-                <span>Downloaded</span>
-                <span class="text-gray-400">{getSortIcon("is_downloaded")}</span
-                >
-              </div>
+              Downloaded
             </th>
             <th
-              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]"
-              onclick={() => handleSort("uploaded_at")}
+              class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]"
             >
-              <div class="flex items-center space-x-1">
-                <span>Upload Date</span>
-                <span class="text-gray-400">{getSortIcon("uploaded_at")}</span>
-              </div>
+              Upload Date
             </th>
             <th
               class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[130px] sm:min-w-[90px]"

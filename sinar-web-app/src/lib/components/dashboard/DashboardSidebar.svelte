@@ -123,7 +123,7 @@
 </script>
 
 <!-- Mobile menu button -->
-<div class="lg:hidden fixed top-4 left-4 z-50">
+<div class="lg:hidden fixed top-4 left-4 z-[110]">
   <button
     onclick={toggleSidebar}
     class="p-2 rounded-md bg-white shadow-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"

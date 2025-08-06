@@ -38,6 +38,8 @@ export interface PaginatedDocumentsResponse {
 export interface PaginationParams {
   page?: number;
   limit?: number;
+  search?: string;
+  order?: 'asc' | 'desc';
 }
 
 export interface UploadDocumentRequest {
@@ -102,17 +104,29 @@ class DocumentService {
    */
   async getPaginatedDocuments(params: PaginationParams = {}): Promise<ApiResponse<PaginatedDocumentsResponse>> {
     try {
-      const { page = 1, limit = 10 } = params;
+      const { page = 1, limit = 10, search, order } = params;
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
       });
 
-      const response = await httpClient.authenticatedRequest<any>(
-        `${this.baseEndpoint}?${queryParams.toString()}`
-      );
+      // Add search parameter if provided
+      if (search && search.trim() !== '') {
+        queryParams.append('search', search.trim());
+      }
 
-      console.log('Document service - paginated response:', response);
+      // Add order parameter if provided
+      if (order && (order === 'asc' || order === 'desc')) {
+        queryParams.append('order', order);
+      }
+
+      const fullUrl = `${this.baseEndpoint}?${queryParams.toString()}`;
+      console.log('🚀 Document Service - Making request to:', fullUrl);
+      console.log('📋 Request parameters:', { page, limit, search, order });
+      
+      const response = await httpClient.authenticatedRequest<any>(fullUrl);
+
+      console.log('✅ Document service - paginated response:', response);
       console.log('Document service - response.data:', response.data);
       console.log('Document service - response.data type:', typeof response.data);
       

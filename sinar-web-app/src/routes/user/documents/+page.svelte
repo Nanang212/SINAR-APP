@@ -6,12 +6,21 @@
   let documentTableRef = $state<DocumentListTable>();
   let selectedDocument = $state<Document | null>(null);
   let searchTerm = $state("");
+  let sortOrder = $state<'asc' | 'desc'>('desc'); // Default to newest first (desc by id)
   let isLoading = $state(false);
 
   function handleSearch(term: string) {
     searchTerm = term;
     if (documentTableRef) {
-      documentTableRef.setSearchTerm(term);
+      documentTableRef.setSearchParams(term, sortOrder);
+    }
+  }
+
+  function handleSortToggle() {
+    const newOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    sortOrder = newOrder;
+    if (documentTableRef) {
+      documentTableRef.setSearchParams(searchTerm, newOrder);
     }
   }
 
@@ -56,10 +65,96 @@
 
         <!-- Navigation and Search -->
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-4">
-          <!-- Search Bar and Refresh Button - moved to right -->
+          <!-- Search Bar, Sort and Refresh Button - moved to right -->
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto ml-auto">
-            <!-- Search Bar -->
-            <div class="relative flex-1 sm:flex-none">
+            <!-- Mobile: Search + Sort Row -->
+            <div class="flex sm:hidden items-center gap-2 w-full">
+              <!-- Mobile Sort Toggle Button (Compact) -->
+              <div class="relative group flex-shrink-0">
+                <button
+                  onclick={handleSortToggle}
+                  class="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-gradient-to-r from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200 border border-gray-300 hover:border-gray-400 rounded-md shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                  title={sortOrder === 'desc' ? 'Currently showing newest first' : 'Currently showing oldest first'}
+                >
+                  <!-- Sort Icon with animation -->
+                  <svg 
+                    class="w-3.5 h-3.5 text-blue-600 transition-transform duration-300 {sortOrder === 'desc' ? 'rotate-0' : 'rotate-180'}" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                  </svg>
+                  
+                  <!-- Compact Text -->
+                  <span class="text-gray-700 font-semibold text-xs">
+                    {sortOrder === 'desc' ? 'New' : 'Old'}
+                  </span>
+                </button>
+              </div>
+
+              <!-- Mobile Search Bar (Flexible) -->
+              <div class="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  class="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={searchTerm}
+                  oninput={(e) => handleSearch(e.currentTarget.value)}
+                />
+                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                  <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Desktop: Sort Toggle Button -->
+            <div class="hidden sm:block relative group">
+              <button
+                onclick={handleSortToggle}
+                class="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200 border border-gray-300 hover:border-gray-400 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 min-w-[100px]"
+                title={sortOrder === 'desc' ? 'Currently showing newest first' : 'Currently showing oldest first'}
+              >
+                <!-- Sort Icon with animation -->
+                <div class="relative">
+                  <svg 
+                    class="w-4 h-4 text-blue-600 transition-transform duration-300 {sortOrder === 'desc' ? 'rotate-0' : 'rotate-180'}" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                  </svg>
+                </div>
+                
+                <!-- Dynamic Text -->
+                <span class="text-gray-700 font-semibold tracking-wide">
+                  {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
+                </span>
+                
+                <!-- Arrow indicator -->
+                <svg 
+                  class="w-3 h-3 text-gray-500 transition-transform duration-200 {sortOrder === 'desc' ? 'rotate-0' : 'rotate-180'}" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7-7-7 7" />
+                </svg>
+              </button>
+              
+              <!-- Tooltip -->
+              <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                Click to sort by {sortOrder === 'desc' ? 'oldest' : 'newest'} first
+                <!-- Tooltip arrow -->
+                <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+
+            <!-- Desktop Search Bar -->
+            <div class="hidden sm:block relative flex-1 sm:flex-none">
               <input
                 type="text"
                 placeholder="Search documents..."
@@ -118,6 +213,7 @@
         onRefresh={() => console.log('Documents refreshed')}
         onRowClick={handleRowClick}
         {searchTerm}
+        {sortOrder}
       />
     </div>
   </div>
