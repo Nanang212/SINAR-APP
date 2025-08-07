@@ -1,20 +1,56 @@
 // ✅ FINAL VERSION - documentReportRepository.js
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-const { findAllBuilder } = require("../utils/query");
 const { deleteReportMedia } = require("../utils/minioHelper");
 const { baseUrl } = require("../../config/dotenv");
 
 exports.findAllReports = async (params) => {
-  const result = await findAllBuilder({
-    model: prisma.documentReport,
-    params: {
-      ...params,
-      where: {
-        ...params?.where,
-      },
-    },
-    customSelect: {
+  const {
+    page = 1,
+    limit = 100,
+    order = "asc",
+    search = "",
+    where = {},
+  } = params;
+
+  const take = parseInt(limit, 10);
+  const skip = (parseInt(page, 10) - 1) * take;
+
+  // Build where clause with search functionality
+  let whereClause = { ...where };
+  
+  if (search && search.trim() !== "") {
+    whereClause = {
+      ...whereClause,
+      OR: [
+        {
+          description: {
+            contains: search.trim(),
+            mode: 'insensitive'
+          }
+        },
+        {
+          original_name: {
+            contains: search.trim(),
+            mode: 'insensitive'
+          }
+        },
+        {
+          document: {
+            original_name: {
+              contains: search.trim(),
+              mode: 'insensitive'
+            }
+          }
+        }
+      ]
+    };
+  }
+
+  // Get all reports first to group by document_id
+  const allReports = await prisma.documentReport.findMany({
+    where: whereClause,
+    select: {
       id: true,
       type: true,
       content: true,
@@ -40,15 +76,20 @@ exports.findAllReports = async (params) => {
         },
       },
     },
-    searchFields: ['description', 'original_name'],
+    orderBy: [
+      {
+        document_id: order.toLowerCase() === "desc" ? "desc" : "asc",
+      },
+      {
+        id: "desc" // Always descending for report id
+      }
+    ]
   });
 
-  const data = Array.isArray(result?.data) ? result.data : [];
-
-  // Format dan kelompokkan berdasarkan document_id
+  // Group reports by document_id
   const groupedByDocument = {};
-
-  for (const report of data) {
+  
+  for (const report of allReports) {
     const documentId = report.document?.id;
     if (!documentId) continue;
 
@@ -97,14 +138,27 @@ exports.findAllReports = async (params) => {
     groupedByDocument[documentKey].reports[type].push(reportItem);
   }
 
-  // 🔢 Total berdasarkan jumlah dokumen unik (bukan total report)
+  // Convert to array and sort by document_id
   const groupedArray = Object.values(groupedByDocument);
-  const totalDocuments = groupedArray.length;
+  const sortedGroups = groupedArray.sort((a, b) => {
+    if (order.toLowerCase() === "desc") {
+      return b.document.id - a.document.id;
+    }
+    return a.document.id - b.document.id;
+  });
+
+  // Apply pagination to grouped documents
+  const totalDocuments = sortedGroups.length;
+  const paginatedData = sortedGroups.slice(skip, skip + take);
 
   return {
-    ...result,
     total: totalDocuments,
-    data: groupedArray,
+    page: parseInt(page, 10),
+    limit: take,
+    data: paginatedData,
+    totalPages: Math.ceil(totalDocuments / take),
+    hasNext: skip + take < totalDocuments,
+    hasPrev: parseInt(page, 10) > 1
   };
 };
 

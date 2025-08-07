@@ -1,10 +1,12 @@
 <script lang="ts">
   import { DashboardLayout } from "$lib";
-  import { ReportTabs, ReportForm, ReportTable } from '@/lib/components/user/reports';
+  import { ReportTabs, ReportForm } from '@/lib/components/user/reports';
+  import ReportListTable from '$lib/components/user/reports/ReportListTable.svelte';
 
   let activeTab = $state("input");
   let reportTableRef = $state<any>();
   let searchTerm = $state("");
+  let sortOrder = $state<'asc' | 'desc'>('desc');
   let isLoading = $state(false);
 
   function handleTabChange(tab: string) {
@@ -20,7 +22,14 @@
   function handleSearch(term: string) {
     searchTerm = term;
     if (reportTableRef) {
-      reportTableRef.setSearchTerm(term);
+      reportTableRef.setSearchParams(term, sortOrder);
+    }
+  }
+
+  function handleSortChange(order: 'asc' | 'desc') {
+    sortOrder = order;
+    if (reportTableRef) {
+      reportTableRef.setSearchParams(searchTerm, order);
     }
   }
 
@@ -58,8 +67,10 @@
           {activeTab}
           onTabChange={handleTabChange}
           onSearch={handleSearch}
+          onSortChange={handleSortChange}
           onRefresh={handleRefresh}
           {searchTerm}
+          {sortOrder}
           {isLoading}
         />
       </div>
@@ -73,10 +84,12 @@
           onReset={handleFormReset}
         />
       {:else if activeTab === "browse"}
-        <ReportTable 
+        <ReportListTable 
           bind:this={reportTableRef}
           fetchOnMount={true}
           onRefresh={() => console.log('Reports refreshed')}
+          {searchTerm}
+          {sortOrder}
         />
       {/if}
     </div>

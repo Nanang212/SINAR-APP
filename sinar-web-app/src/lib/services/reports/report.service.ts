@@ -99,6 +99,7 @@ export interface PaginationParams {
   page?: number;
   limit?: number;
   search?: string;
+  order?: 'asc' | 'desc';
   document_id?: number;
 }
 
@@ -210,40 +211,44 @@ class ReportService {
    */
   async getPaginatedReports(params: PaginationParams = {}): Promise<ApiResponse<PaginatedReportsResponse>> {
     try {
-      const { page = 1, limit = 10, search, document_id } = params;
+      const { page = 1, limit = 10, search, order, document_id } = params;
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
       });
 
-      if (search) {
-        queryParams.append('search', search);
+      // Add search parameter if provided
+      if (search && search.trim() !== '') {
+        queryParams.append('search', search.trim());
+      }
+
+      // Add order parameter if provided
+      if (order && (order === 'asc' || order === 'desc')) {
+        queryParams.append('order', order);
       }
 
       if (document_id) {
         queryParams.append('document_id', document_id.toString());
       }
 
-      const response = await httpClient.authenticatedRequest<any>(
-        `${this.baseEndpoint}?${queryParams.toString()}`
-      );
+      const fullUrl = `${this.adminBaseEndpoint}?${queryParams.toString()}`;
+      console.log('🚀 Report Service - Making request to:', fullUrl);
+      console.log('📋 Request parameters:', { page, limit, search, order, document_id });
+      
+      const response = await httpClient.authenticatedRequest<any>(fullUrl);
 
       console.log('Report service - paginated response:', response);
       
       if (response.status && response.data) {
-        const reports = Array.isArray(response.data) ? response.data : [];
-        const total = response.total || 0;
-        const currentPage = response.page || page;
-        const totalPages = Math.ceil(total / limit);
-        
+        // Response sudah dalam format yang benar dengan total, totalPages, dll
         const paginatedResponse: PaginatedReportsResponse = {
           status: response.status,
           code: response.code,
           message: response.message,
-          total: total,
-          totalPages: totalPages,
-          currentPage: currentPage,
-          data: reports,
+          total: response.total || 0,
+          totalPages: response.totalPages || Math.ceil((response.total || 0) / limit),
+          currentPage: response.page || page,
+          data: Array.isArray(response.data) ? response.data : [],
         };
 
         return {

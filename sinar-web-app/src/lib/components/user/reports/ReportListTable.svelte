@@ -1,227 +1,535 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { reportService, type Report, type PaginationParams } from '$lib/services';
+
+  // Transform API Document to display format
+  interface DisplayDocument {
+    id: string;
+    document_title: string;
+    document_original_name: string;
+    document_url: string;
+    created_at: string;
+    textCount: number;
+    linkCount: number;
+    audioCount: number;
+    videoCount: number;
+    totalCount: number;
+    iconColor: string;
+  }
+
   interface $$Props {
     fetchOnMount?: boolean;
     onRefresh?: () => void;
+    onRowClick?: (report: any) => void;
     searchTerm?: string;
+    sortOrder?: 'asc' | 'desc';
   }
 
   let {
     fetchOnMount = false,
     onRefresh,
+    onRowClick,
     searchTerm = "",
+    sortOrder = 'desc',
   }: $$Props = $props();
 
   // Component state
   let isLoading = $state(false);
+  let error = $state<string | null>(null);
+  let apiDocuments = $state<any[]>([]);
+  let documents = $state<DisplayDocument[]>([]);
+
+  // Server-side pagination state
+  let currentPage = $state(1);
+  let pageSize = $state(10);
+  let pendingDownloadRefresh = $state(false);
+
+  // Pagination state
+  let totalRecords = $state(0);
+  let totalPages = $state(0);
+
+  // Backend handles search and sorting
+  const paginatedData = $derived(() => documents);
+  const filteredTotalRecords = $derived(() => totalRecords);
+  const filteredTotalPages = $derived(() => totalPages);
+
+  // Transform API document to display format
+  function transformApiDocument(docGroup: any): DisplayDocument {
+    const document = docGroup.document;
+    const reports = docGroup.reports;
+    
+    // Count each report type
+    const textCount = reports.TEXT?.length || 0;
+    const linkCount = reports.LINK?.length || 0;
+    const audioCount = reports.AUDIO?.length || 0;
+    const videoCount = reports.VIDEO?.length || 0;
+    const totalCount = textCount + linkCount + audioCount + videoCount;
+    
+    // Get latest created_at from all reports for sorting
+    let latestCreatedAt = '';
+    ['TEXT', 'LINK', 'AUDIO', 'VIDEO'].forEach(type => {
+      if (reports[type] && reports[type].length > 0) {
+        const latestInType = reports[type].reduce((latest: any, current: any) => 
+          new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+        );
+        if (!latestCreatedAt || new Date(latestInType.created_at) > new Date(latestCreatedAt)) {
+          latestCreatedAt = latestInType.created_at;
+        }
+      }
+    });
+    
+    return {
+      id: document.id.toString(),
+      document_title: document.original_name || 'Unknown Document',
+      document_original_name: document.original_name || 'unknown.file',
+      document_url: document.url || '',
+      created_at: latestCreatedAt ? formatDate(latestCreatedAt) : '-',
+      textCount,
+      linkCount,
+      audioCount,
+      videoCount,
+      totalCount,
+      iconColor: getIconColorByDocument(document.original_name || '')
+    };
+  }
+
+  function formatDate(dateString: string): string {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return dateString;
+    }
+  }
+
+  function getIconColorByDocument(filename: string): string {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return "text-red-500";
+      case 'doc':
+      case 'docx':
+        return "text-blue-500";
+      case 'xls':
+      case 'xlsx':
+        return "text-green-500";
+      case 'ppt':
+      case 'pptx':
+        return "text-orange-500";
+      default:
+        return "text-gray-500";
+    }
+  }
+
+  // Fetch reports with server-side pagination, search and sort
+  async function fetchReports(page: number = 1, search: string = '', order: 'asc' | 'desc' = 'desc') {
+    console.log(`Starting fetchReports with pagination - Page: ${page}, Search: "${search}", Order: ${order}`);
+    isLoading = true;
+    error = null;
+
+    try {
+      // Use backend pagination with search and sort
+      console.log("Calling reportService.getPaginatedReports() with backend pagination, search and sort...");
+      const params: PaginationParams = {
+        page: page,
+        limit: pageSize,
+        search: search,
+        order: order,
+      };
+      
+      const response = await reportService.getPaginatedReports(params);
+      console.log("API Response:", response);
+      
+      if (response.status === true && response.data) {
+        console.log("API Response data:", response.data);
+        
+        const paginatedData = response.data;
+        if (paginatedData.data && Array.isArray(paginatedData.data)) {
+          console.log("Processing", paginatedData.data.length, "grouped report documents...");
+          
+          // Store original API data and transform to display format
+          apiDocuments = paginatedData.data; // Store original API documents
+          documents = paginatedData.data.map(transformApiDocument);
+          
+          // Use pagination info from API response
+          totalRecords = paginatedData.total || 0;
+          totalPages = paginatedData.totalPages || Math.ceil(totalRecords / pageSize);
+          currentPage = page;
+          
+          console.log("Documents loaded - Total:", totalRecords, "Current Page:", currentPage, "Total Pages:", totalPages);
+          error = null; // Clear any previous errors
+        } else {
+          console.error("Invalid response format - expected nested data with data array:", paginatedData);
+          error = "Invalid response format";
+          documents = [];
+          totalRecords = 0;
+          totalPages = 0;
+        }
+      } else {
+        console.error("Failed to fetch reports:", response.message);
+        error = response.message || "Failed to fetch reports";
+        documents = [];
+        totalRecords = 0;
+        totalPages = 0;
+      }
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      error = errorMessage;
+      documents = [];
+      totalRecords = 0;
+      totalPages = 0;
+    } finally {
+      isLoading = false;
+      console.log("fetchReports completed, isLoading:", isLoading);
+    }
+  }
 
   // Handle refresh
   async function handleRefresh() {
-    isLoading = true;
-    setTimeout(() => {
-      isLoading = false;
-      onRefresh?.();
-    }, 1000);
+    await fetchReports(currentPage, searchTerm, sortOrder);
+    onRefresh?.();
   }
 
-  // Public method to load reports (called from parent)
+  // Fetch on mount if required
+  onMount(() => {
+    if (fetchOnMount) {
+      fetchReports(1, searchTerm, sortOrder);
+    }
+
+    // Add window focus listener to refresh data after download
+    const handleWindowFocus = async () => {
+      if (pendingDownloadRefresh) {
+        console.log('Window regained focus, refreshing report data after download...');
+        pendingDownloadRefresh = false;
+        await fetchReports(currentPage, searchTerm, sortOrder);
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  });
+
+  // Public method to fetch reports (called from parent)
   export function loadReports() {
-    return handleRefresh();
+    return fetchReports(1, searchTerm, sortOrder);
   }
 
-  // Public method to set search term (called from parent)
-  export function setSearchTerm(term: string) {
-    // Search functionality not implemented yet
+  // Public method to set search parameters (called from parent)
+  export function setSearchParams(search: string, order: 'asc' | 'desc') {
+    currentPage = 1; // Reset to page 1 when search/sort changes
+    fetchReports(1, search, order);
   }
+
+  async function handlePageChange(newPage: number) {
+    if (newPage >= 1 && newPage <= filteredTotalPages()) {
+      await fetchReports(newPage, searchTerm, sortOrder);
+    }
+  }
+
+  function handleRowClick(document: DisplayDocument) {
+    // Find the corresponding API document
+    const apiDocument = apiDocuments.find(apiDoc => apiDoc.document.id.toString() === document.id);
+    
+    if (apiDocument && onRowClick) {
+      onRowClick(apiDocument);
+    }
+  }
+
+  // Format media counts untuk display (hanya yang > 0)
+  function formatMediaCounts(document: DisplayDocument): string {
+    const counts = [];
+    
+    if (document.textCount > 0) {
+      counts.push(`${document.textCount} Text${document.textCount > 1 ? 's' : ''}`);
+    }
+    if (document.linkCount > 0) {
+      counts.push(`${document.linkCount} Link${document.linkCount > 1 ? 's' : ''}`);
+    }
+    if (document.audioCount > 0) {
+      counts.push(`${document.audioCount} Audio${document.audioCount > 1 ? 's' : ''}`);
+    }
+    if (document.videoCount > 0) {
+      counts.push(`${document.videoCount} Video${document.videoCount > 1 ? 's' : ''}`);
+    }
+    
+    return counts.length > 0 ? counts.join(', ') : 'No media content';
+  }
+
+  // Get media counts with colors untuk badges
+  function getMediaCountBadges(document: DisplayDocument) {
+    const badges = [];
+    
+    if (document.textCount > 0) {
+      badges.push({
+        text: `${document.textCount} Text${document.textCount > 1 ? 's' : ''}`,
+        color: 'text-amber-800',
+        bg: 'bg-amber-100'
+      });
+    }
+    if (document.linkCount > 0) {
+      badges.push({
+        text: `${document.linkCount} Link${document.linkCount > 1 ? 's' : ''}`,
+        color: 'text-purple-800',
+        bg: 'bg-purple-100'
+      });
+    }
+    if (document.audioCount > 0) {
+      badges.push({
+        text: `${document.audioCount} Audio${document.audioCount > 1 ? 's' : ''}`,
+        color: 'text-blue-800',
+        bg: 'bg-blue-100'
+      });
+    }
+    if (document.videoCount > 0) {
+      badges.push({
+        text: `${document.videoCount} Video${document.videoCount > 1 ? 's' : ''}`,
+        color: 'text-red-800',
+        bg: 'bg-red-100'
+      });
+    }
+    
+    return badges;
+  }
+
 </script>
 
-<div class="pl-6 pr-8 pb-6 pt-12">
+<div class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-8 sm:pt-12">
+  <!-- Error State -->
+  {#if error}
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+      <div class="flex">
+        <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">Error loading reports</h3>
+          <p class="mt-1 text-sm text-red-700">{error}</p>
+          <button onclick={handleRefresh} class="mt-2 text-sm font-medium text-red-800 hover:text-red-900 underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <!-- Loading State -->
   {#if isLoading}
     <div class="flex justify-center items-center py-12">
       <div class="flex items-center space-x-2">
-        <svg
-          class="w-6 h-6 text-blue-600 animate-spin"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-          />
+        <svg class="w-6 h-6 text-blue-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
         <span class="text-gray-700">Loading reports...</span>
       </div>
     </div>
   {:else}
-    <!-- 404 Not Found Content -->
-    <div class="flex flex-col items-center justify-center py-8 px-4">
-      <!-- 404 Illustration SVG -->
-      <div class="mb-6">
-        <svg
-          class="w-64 h-64 text-gray-400"
-          fill="none"
-          viewBox="0 0 500 500"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <!-- Background Elements -->
-          <defs>
-            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:0.1" />
-              <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:0.1" />
-            </linearGradient>
-            <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#EF4444;stop-opacity:0.1" />
-              <stop offset="100%" style="stop-color:#F59E0B;stop-opacity:0.1" />
-            </linearGradient>
-          </defs>
-          
-          <!-- Background Shapes -->
-          <circle cx="100" cy="100" r="60" fill="url(#grad1)" opacity="0.3"/>
-          <circle cx="400" cy="120" r="40" fill="url(#grad2)" opacity="0.3"/>
-          <circle cx="380" cy="350" r="50" fill="url(#grad1)" opacity="0.2"/>
-          <circle cx="80" cy="380" r="35" fill="url(#grad2)" opacity="0.2"/>
-          
-          <!-- Main Character - Robot/Explorer -->
-          <g transform="translate(200, 150)">
-            <!-- Robot Body -->
-            <rect x="30" y="80" width="40" height="60" rx="8" fill="#3B82F6" opacity="0.8"/>
+    <!-- Data Table -->
+    <div class="flex-1 pr-0 sm:pr-4 overflow-auto">
+      <div class="mt-16 sm:mt-8">
+      <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
+      <thead class="bg-gray-50 sticky top-6 sm:top-2 z-10">
+        <tr>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[220px] sm:min-w-[180px]">
+            Document
+          </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[200px] sm:min-w-[160px]">
+            Media Content
+          </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]">
+            Latest Report
+          </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[130px] sm:min-w-[90px]">
+            Actions
+          </th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        {#each paginatedData() as document (document.id)}
+          <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-200" onclick={() => handleRowClick(document)}>
+            <!-- Document Column -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
+              <div class="flex items-center">
+                <svg class="h-6 w-6 sm:h-8 sm:w-8 {document.iconColor} mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 2v10H4V5h12z" clip-rule="evenodd" />
+                  <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
+                </svg>
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium text-gray-900 truncate" title={document.document_original_name}>
+                    {document.document_original_name}
+                  </div>
+                </div>
+              </div>
+            </td>
             
-            <!-- Robot Head -->
-            <rect x="35" y="50" width="30" height="35" rx="15" fill="#1E40AF" opacity="0.9"/>
+            <!-- Media Content Column -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
+              <div class="flex flex-wrap gap-1">
+                {#if getMediaCountBadges(document).length > 0}
+                  {#each getMediaCountBadges(document) as badge}
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {badge.bg} {badge.color}">
+                      {badge.text}
+                    </span>
+                  {/each}
+                {:else}
+                  <span class="text-xs text-gray-500 italic">No media content</span>
+                {/if}
+              </div>
+            </td>
             
-            <!-- Robot Eyes -->
-            <circle cx="42" cy="62" r="3" fill="#FFF"/>
-            <circle cx="58" cy="62" r="3" fill="#FFF"/>
-            <circle cx="42" cy="62" r="1.5" fill="#1E40AF"/>
-            <circle cx="58" cy="62" r="1.5" fill="#1E40AF"/>
+            <!-- Latest Report Date -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 border-r border-gray-200">
+              <div class="hidden sm:block">{document.created_at}</div>
+              <div class="sm:hidden">{document.created_at.split(' ')[0]}</div>
+            </td>
             
-            <!-- Robot Arms -->
-            <rect x="15" y="85" width="12" height="25" rx="6" fill="#3B82F6" opacity="0.7"/>
-            <rect x="73" y="85" width="12" height="25" rx="6" fill="#3B82F6" opacity="0.7"/>
-            
-            <!-- Robot Legs -->
-            <rect x="35" y="140" width="8" height="20" rx="4" fill="#1E40AF" opacity="0.8"/>
-            <rect x="57" y="140" width="8" height="20" rx="4" fill="#1E40AF" opacity="0.8"/>
-            
-            <!-- Magnifying Glass in Hand -->
-            <g transform="translate(85, 95)">
-              <circle cx="0" cy="0" r="12" fill="none" stroke="#3B82F6" stroke-width="2"/>
-              <line x1="8" y1="8" x2="18" y2="18" stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
-              <!-- Big Question Mark in Glass -->
-              <path d="M-5 -8 Q0 -12 5 -8 Q5 -3 0 -3" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round"/>
-              <circle cx="0" cy="3" r="1" fill="#EF4444"/>
-            </g>
-          </g>
-          
-          <!-- Floating Documents -->
-          <g opacity="0.6">
-            <!-- Document 1 -->
-            <g transform="translate(80, 200) rotate(-15)">
-              <rect width="30" height="40" rx="3" fill="#F3F4F6" stroke="#D1D5DB" stroke-width="1"/>
-              <line x1="5" y1="8" x2="25" y2="8" stroke="#9CA3AF" stroke-width="1"/>
-              <line x1="5" y1="14" x2="20" y2="14" stroke="#9CA3AF" stroke-width="1"/>
-              <line x1="5" y1="20" x2="25" y2="20" stroke="#9CA3AF" stroke-width="1"/>
-            </g>
-            
-            <!-- Document 2 -->
-            <g transform="translate(350, 180) rotate(10)">
-              <rect width="35" height="45" rx="3" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1"/>
-              <line x1="6" y1="10" x2="29" y2="10" stroke="#D97706" stroke-width="1"/>
-              <line x1="6" y1="16" x2="24" y2="16" stroke="#D97706" stroke-width="1"/>
-              <line x1="6" y1="22" x2="29" y2="22" stroke="#D97706" stroke-width="1"/>
-            </g>
-            
-            <!-- Document 3 -->
-            <g transform="translate(120, 350) rotate(20)">
-              <rect width="28" height="35" rx="3" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1"/>
-              <line x1="4" y1="7" x2="24" y2="7" stroke="#1D4ED8" stroke-width="1"/>
-              <line x1="4" y1="12" x2="19" y2="12" stroke="#1D4ED8" stroke-width="1"/>
-              <line x1="4" y1="17" x2="24" y2="17" stroke="#1D4ED8" stroke-width="1"/>
-            </g>
-          </g>
-          
-          <!-- Charts/Analytics Icons -->
-          <g transform="translate(320, 250)" opacity="0.4">
-            <!-- Bar Chart -->
-            <rect x="0" y="20" width="6" height="15" fill="#3B82F6"/>
-            <rect x="8" y="10" width="6" height="25" fill="#8B5CF6"/>
-            <rect x="16" y="15" width="6" height="20" fill="#EF4444"/>
-            <rect x="24" y="5" width="6" height="30" fill="#10B981"/>
-          </g>
-          
-          <!-- Pie Chart -->
-          <g transform="translate(380, 280)" opacity="0.4">
-            <circle cx="0" cy="0" r="15" fill="#E5E7EB"/>
-            <path d="M 0 0 L 0 -15 A 15 15 0 0 1 10.6 -10.6 Z" fill="#3B82F6"/>
-            <path d="M 0 0 L 10.6 -10.6 A 15 15 0 0 1 10.6 10.6 Z" fill="#8B5CF6"/>
-            <path d="M 0 0 L 10.6 10.6 A 15 15 0 1 1 0 -15 Z" fill="#EF4444"/>
-          </g>
-          
-          <!-- Floating Numbers/Stats -->
-          <text x="120" y="120" class="text-2xl font-bold" fill="#3B82F6" opacity="0.3">0</text>
-          <text x="350" y="100" class="text-lg font-bold" fill="#8B5CF6" opacity="0.3">%</text>
-          <text x="80" y="320" class="text-xl font-bold" fill="#EF4444" opacity="0.3">?</text>
-          
-          <!-- Main 404 Text -->
-          <text x="250" y="420" text-anchor="middle" class="text-7xl font-bold" fill="#374151" opacity="0.2">404</text>
-          
-          <!-- Decorative Stars -->
-          <g fill="#F59E0B" opacity="0.3">
-            <polygon points="450,80 452,86 458,86 453,90 455,96 450,92 445,96 447,90 442,86 448,86" />
-            <polygon points="60,150 61,154 65,154 62,157 63,161 60,158 57,161 58,157 55,154 59,154" />
-            <polygon points="420,200 421,203 424,203 422,205 423,208 420,206 417,208 418,205 416,203 419,203" />
-          </g>
-          
-          <!-- Speech Bubble from Robot -->
-          <g transform="translate(280, 180)">
-            <ellipse cx="20" cy="0" rx="40" ry="20" fill="#FFF" stroke="#D1D5DB" stroke-width="2" opacity="0.9"/>
-            <polygon points="5,10 15,5 10,15" fill="#FFF" stroke="#D1D5DB" stroke-width="2" opacity="0.9"/>
-            <text x="20" y="5" text-anchor="middle" class="text-sm font-medium" fill="#374151">Reports not found!</text>
-          </g>
+            <!-- Actions -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
+              <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
+                <!-- View Details Button -->
+                <div class="relative group">
+                  <button
+                    onclick={() => console.log('View details', document)}
+                    class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                    aria-label="View details"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </button>
+                  <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-5">
+                    View Details
+                  </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="h-6 w-px bg-gray-300"></div>
+
+                <!-- Download Document Button -->
+                <div class="relative group">
+                  <button
+                    onclick={() => window.open(document.document_url, '_blank')}
+                    class="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
+                    aria-label="Download document"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m5-7V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-1" />
+                    </svg>
+                  </button>
+                  <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-5">
+                    Download Document
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+      </table>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    {#if paginatedData().length === 0 && !isLoading}
+      <div class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No reports found</h3>
+        <p class="mt-1 text-sm text-gray-500">No reports available on this page.</p>
+      </div>
+    {/if}
+
+    <!-- Pagination -->
+    <div class="flex-shrink-0 flex flex-col sm:flex-row items-center justify-between mt-4 sm:mt-6 pt-4 border-t border-gray-200 bg-white gap-4 sm:gap-0">
+      <div class="text-xs sm:text-sm text-gray-700 order-2 sm:order-1">
+        <span class="hidden sm:inline">
+          Showing <span class="font-medium">{Math.min((currentPage - 1) * pageSize + 1, filteredTotalRecords())}</span>
+          to
+          <span class="font-medium">{Math.min(currentPage * pageSize, filteredTotalRecords())}</span>
+          of <span class="font-medium">{filteredTotalRecords()}</span> results
+        </span>
+        <span class="sm:hidden">
+          {Math.min((currentPage - 1) * pageSize + 1, filteredTotalRecords())}-{Math.min(currentPage * pageSize, filteredTotalRecords())} of {filteredTotalRecords()}
+        </span>
       </div>
 
-      <!-- Error Message -->
-      <div class="text-center max-w-lg">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2">Reports Coming Soon</h1>
-        <p class="text-gray-600 mb-4">
-          This feature is under development and will provide analytics about your documents.
-        </p>
-        
-        <!-- Feature Preview -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <div class="flex flex-wrap justify-center gap-2 text-xs text-blue-700">
-            <span class="bg-blue-100 px-2 py-1 rounded">📊 Analytics</span>
-            <span class="bg-blue-100 px-2 py-1 rounded">📈 Statistics</span>
-            <span class="bg-blue-100 px-2 py-1 rounded">📋 Reports</span>
-            <span class="bg-blue-100 px-2 py-1 rounded">📤 Export</span>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex gap-3 justify-center">
+      <div class="flex items-center space-x-1 sm:space-x-2 order-1 sm:order-2">
+        <!-- Desktop: Show all buttons -->
+        <div class="hidden sm:flex items-center space-x-2">
           <button
-            onclick={handleRefresh}
-            disabled={isLoading}
-            class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+            onclick={() => handlePageChange(1)}
+            disabled={currentPage === 1}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg class="w-4 h-4 mr-1 {isLoading ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-            {isLoading ? 'Checking...' : 'Check Again'}
+            First
           </button>
-          
+
           <button
-            onclick={() => window.history.back()}
-            class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            onclick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            Previous
+          </button>
+
+          <span class="px-3 py-1 text-sm text-white bg-blue-600 border border-blue-600 rounded-md">
+            {currentPage} of {Math.max(1, filteredTotalPages())}
+          </span>
+
+          <button
+            onclick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= filteredTotalPages()}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+
+          <button
+            onclick={() => handlePageChange(filteredTotalPages())}
+            disabled={currentPage >= filteredTotalPages()}
+            class="px-3 py-1 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Last
+          </button>
+        </div>
+        
+        <!-- Mobile: Show compact buttons -->
+        <div class="flex sm:hidden items-center space-x-1">
+          <button
+            onclick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            class="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Previous page"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
-            Go Back
+          </button>
+
+          <span class="px-3 py-1 text-sm text-white bg-blue-600 border border-blue-600 rounded-md min-w-[80px] text-center">
+            {currentPage}/{Math.max(1, filteredTotalPages())}
+          </span>
+
+          <button
+            onclick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= filteredTotalPages()}
+            class="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Next page"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         </div>
       </div>

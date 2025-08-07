@@ -22,6 +22,16 @@
   let isSubmitting = $state(false);
   let isFormDisabled = $state(false);
   
+  // Infinite scrolling state
+  let currentPage = $state(1);
+  let hasMorePages = $state(true);
+  let isLoadingMore = $state(false);
+  let totalDocuments = $state(0);
+  
+  // Search state
+  let searchQuery = $state('');
+  let isSearching = $state(false);
+  
   // Media items (notes is now separate media type)
   interface MediaItem {
     id: string;
@@ -56,7 +66,7 @@
 
   // Load documents on mount
   onMount(async () => {
-    await loadDocuments();
+    await loadDocuments(1, '', false);
   });
 
   // Load report data into form when provided
@@ -66,22 +76,103 @@
     }
   });
 
-  async function loadDocuments() {
-    documentsLoading = true;
+  async function loadDocuments(page = 1, search = '', append = false) {
+    console.log(`🚀 Loading documents - Page: ${page}, Search: "${search}", Append: ${append}`);
+    
+    if (page === 1) {
+      documentsLoading = true;
+    } else {
+      isLoadingMore = true;
+    }
+    
     try {
-      const response = await documentService.getAllDocuments();
+      // Use paginated documents with fixed order 'desc' (newest first)
+      const response = await documentService.getPaginatedDocuments({
+        page: page,
+        limit: 10,
+        search: search.trim() || undefined,
+        order: 'desc' // Always newest first
+      });
+      
+      console.log('📋 Document response:', response);
+      
       if (response.status && response.data) {
-        documents = response.data;
+        const paginatedData = response.data;
+        const newDocuments = paginatedData.data || [];
+        
+        if (append && page > 1) {
+          // Append new documents to existing list
+          documents = [...documents, ...newDocuments];
+          console.log(`➕ Appended ${newDocuments.length} documents. Total: ${documents.length}`);
+        } else {
+          // Replace documents (first load or search)
+          documents = newDocuments;
+          console.log(`🔄 Loaded ${newDocuments.length} documents`);
+        }
+        
+        // Update pagination info
+        currentPage = page;
+        totalDocuments = paginatedData.total || 0;
+        hasMorePages = page < (paginatedData.totalPages || 0);
+        
+        console.log(`📊 Page ${page}/${paginatedData.totalPages || 0}, Total: ${totalDocuments}, HasMore: ${hasMorePages}`);
       } else {
         console.error('Failed to load documents:', response.message);
-        documents = [];
+        if (!append) {
+          documents = [];
+          totalDocuments = 0;
+          hasMorePages = false;
+        }
       }
     } catch (error) {
       console.error('Error loading documents:', error);
-      documents = [];
+      if (!append) {
+        documents = [];
+        totalDocuments = 0;
+        hasMorePages = false;
+      }
     } finally {
       documentsLoading = false;
+      isLoadingMore = false;
+      isSearching = false;
     }
+  }
+  
+  // Load more documents for infinite scroll
+  async function loadMoreDocuments() {
+    if (!hasMorePages || isLoadingMore) return;
+    
+    const nextPage = currentPage + 1;
+    await loadDocuments(nextPage, searchQuery, true);
+  }
+  
+  // Handle search with debouncing
+  let searchTimeout: NodeJS.Timeout;
+  async function handleSearchChange(query: string) {
+    searchQuery = query;
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // If search is empty, reset to initial state
+    if (query.trim() === '') {
+      console.log('🔍 Search cleared, resetting to initial state');
+      currentPage = 1;
+      hasMorePages = true;
+      await loadDocuments(1, '', false);
+      return;
+    }
+    
+    // Debounce search
+    isSearching = true;
+    searchTimeout = setTimeout(async () => {
+      console.log('🔍 Searching for:', query);
+      currentPage = 1;
+      hasMorePages = true;
+      await loadDocuments(1, query, false);
+    }, 500);
   }
 
   function populateForm(report: Report) {
@@ -469,7 +560,7 @@
             </svg>
             <span class="text-sm text-gray-500">Loading documents...</span>
           </div>
-        {:else if documents.length === 0}
+        {:else if documents.length === 0 && searchQuery.trim() === ''}
           <div class="p-3 border border-gray-300 rounded-md bg-gray-50 text-sm text-red-500">
             No documents available. Please try refreshing the page.
           </div>
@@ -491,6 +582,15 @@
                   <div>
                     <div class="text-sm font-medium text-gray-900">{selectedDoc.title}</div>
                     <div class="text-xs text-gray-500">{selectedDoc.original_name}</div>
+                    <div class="mt-1">
+                      <span
+                        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {selectedDoc.is_downloaded
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'}"
+                      >
+                        {selectedDoc.is_downloaded ? "Downloaded" : "Not Downloaded"}
+                      </span>
+                    </div>
                   </div>
                 {/if}
               {/if}
@@ -509,9 +609,66 @@
           {#if isDocumentDropdownOpen}
             <div 
               id="document-dropdown"
-              class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+              class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-hidden"
             >
-              <div class="p-2">
+              <!-- Search Bar inside dropdown -->
+              <div class="p-3 border-b border-gray-100 bg-gray-50">
+                <div class="relative">
+                  <input
+                    type="text"
+                    placeholder="Search documents..."
+                    bind:value={searchQuery}
+                    oninput={(e) => handleSearchChange(e.currentTarget.value)}
+                    disabled={isFormDisabled}
+                    class="w-full pl-8 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    autofocus
+                  />
+                  <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                    {#if isSearching}
+                      <svg class="h-4 w-4 text-blue-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    {:else}
+                      <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    {/if}
+                  </div>
+                </div>
+                
+                <!-- Search results info -->
+                <div class="mt-1 text-xs text-gray-600">
+                  {#if searchQuery.trim() !== ''}
+                    {#if isSearching}
+                      Searching...
+                    {:else}
+                      Found {totalDocuments} document{totalDocuments !== 1 ? 's' : ''} for "{searchQuery}"
+                      {#if totalDocuments === 0}
+                        - <button 
+                          onclick={() => handleSearchChange('')} 
+                          class="text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Clear search
+                        </button>
+                      {/if}
+                    {/if}
+                  {:else if totalDocuments > 0}
+                    Total {totalDocuments} documents (newest first)
+                  {/if}
+                </div>
+              </div>
+              
+              <!-- Documents List -->
+              <div class="max-h-48 overflow-y-auto"
+                   onscroll={(e) => {
+                     const element = e.currentTarget;
+                     const threshold = 50; // Load more when within 50px of bottom
+                     if (element.scrollTop + element.clientHeight >= element.scrollHeight - threshold) {
+                       loadMoreDocuments();
+                     }
+                   }}
+              >
+                <div class="p-2">
                 {#each documents as document (document.id)}
                   <button
                     type="button"
@@ -524,13 +681,69 @@
                     <div class="text-xs text-gray-500">
                       {document.original_name}
                     </div>
-                    {#if document.remark}
-                      <div class="text-xs text-gray-400 mt-1">
-                        {document.remark}
-                      </div>
-                    {/if}
+                    <div class="mt-1">
+                      <span
+                        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {document.is_downloaded
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'}"
+                      >
+                        {document.is_downloaded ? "Downloaded" : "Not Downloaded"}
+                      </span>
+                    </div>
                   </button>
                 {/each}
+                
+                <!-- Load More Indicator -->
+                {#if isLoadingMore}
+                  <div class="flex items-center justify-center p-3">
+                    <svg class="w-4 h-4 text-blue-600 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span class="text-sm text-gray-600">Loading more...</span>
+                  </div>
+                {:else if hasMorePages && documents.length > 0}
+                  <div class="text-center p-2">
+                    <button
+                      type="button"
+                      onclick={loadMoreDocuments}
+                      class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Load more documents
+                    </button>
+                  </div>
+                {:else if !hasMorePages && documents.length > 0}
+                  <div class="text-center p-2">
+                    <span class="text-xs text-gray-500">
+                      All {totalDocuments} documents loaded
+                    </span>
+                  </div>
+                {/if}
+                
+                <!-- No results for search -->
+                {#if documents.length === 0 && searchQuery.trim() !== '' && !isSearching}
+                  <div class="text-center p-6">
+                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <div class="text-sm text-gray-600 mb-3">
+                      No documents found for <span class="font-medium">"{searchQuery}"</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mb-3">
+                      Try different keywords or check your spelling
+                    </div>
+                    <button
+                      type="button"
+                      onclick={() => handleSearchChange('')}
+                      class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                    >
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Show all documents
+                    </button>
+                  </div>
+                {/if}
+                </div>
               </div>
             </div>
           {/if}
