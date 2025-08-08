@@ -54,6 +54,9 @@
   let urlInput = $state('http://');
   let textInput = $state(''); // renamed from noteInput, now for notes content
   
+  // Temporary URL list for multiple URL selection
+  let tempUrlList = $state<string[]>([]);
+  
   // Upload progress states
   let uploadProgress = $state<{
     current: number;
@@ -336,6 +339,7 @@
     selectedFile = null;
     urlInput = 'http://';
     textInput = '';
+    tempUrlList = [];
     formRef?.reset();
     onReset?.();
   }
@@ -376,45 +380,63 @@
 
   function handleFileSelect(event: Event) {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = input.files;
     
-    if (file && currentMediaType) {
+    if (files && files.length > 0 && currentMediaType) {
       const allowedExtensions = currentMediaType === 'audio' 
         ? ['.mp3', '.m4a', '.wav', '.aac']
         : ['.mp4', '.avi', '.mov', '.wmv', '.mkv'];
       
-      const fileName = file.name.toLowerCase();
-      const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
+      let addedCount = 0;
+      let errorCount = 0;
       
-      if (isValidType) {
-        selectedFile = file;
-      } else {
-        modalToastStore.error(`Invalid ${currentMediaType} file. Allowed: ${allowedExtensions.join(', ')}`);
-        input.value = '';
+      // Process each selected file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileName = file.name.toLowerCase();
+        const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (isValidType) {
+          // Auto-add each valid file to media items
+          const newItem: MediaItem = {
+            id: Date.now().toString() + '_' + i, // Ensure unique IDs
+            type: currentMediaType,
+            file: file,
+            createdAt: new Date()
+          };
+          
+          mediaItems = [...mediaItems, newItem];
+          addedCount++;
+        } else {
+          errorCount++;
+        }
       }
+      
+      // Show result messages
+      if (addedCount > 0) {
+        modalToastStore.success(`Added ${addedCount} ${currentMediaType} file(s) to the list`);
+      }
+      
+      if (errorCount > 0) {
+        modalToastStore.error(`${errorCount} file(s) skipped. Allowed: ${allowedExtensions.join(', ')}`);
+      }
+      
+      // Reset form and close modal after auto-adding
+      showMediaForm = false;
+      currentMediaType = null;
+      selectedFile = null;
+      input.value = '';
     }
   }
 
   function addMediaItem() {
     if (!currentMediaType) return;
 
-    // Validation
+    // For URL type, use the new multiple URL workflow
     if (currentMediaType === 'url') {
-      const trimmedUrl = urlInput.trim();
-      if (!trimmedUrl || trimmedUrl === 'http://' || trimmedUrl === 'https://') {
-        modalToastStore.error('Please enter a valid URL');
-        return;
-      }
-      
-      // Add URL media item
-      const newItem: MediaItem = {
-        id: Date.now().toString(),
-        type: 'url',
-        url: trimmedUrl,
-        createdAt: new Date()
-      };
-      
-      mediaItems = [...mediaItems, newItem];
+      // This function is now only used for the "Add Links" button
+      // Individual URLs are added via addUrlToTempList
+      return;
     } else if (currentMediaType === 'notes') {
       const trimmedText = textInput.trim();
       if (!trimmedText) {
@@ -459,6 +481,64 @@
   function removeMediaItem(id: string) {
     mediaItems = mediaItems.filter(item => item.id !== id);
   }
+  
+  // Helper functions for URL management
+  function addUrlToTempList() {
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl || trimmedUrl === 'http://' || trimmedUrl === 'https://') {
+      modalToastStore.error('Please enter a valid URL');
+      return;
+    }
+    
+    // Check for duplicates
+    if (tempUrlList.includes(trimmedUrl)) {
+      modalToastStore.error('URL already added to the list');
+      return;
+    }
+    
+    tempUrlList = [...tempUrlList, trimmedUrl];
+    urlInput = 'http://'; // Reset input
+  }
+  
+  function removeUrlFromTempList(index: number) {
+    tempUrlList = tempUrlList.filter((_, i) => i !== index);
+  }
+  
+  function addAllUrlsToMainList() {
+    const currentUrl = urlInput.trim();
+    let allUrls = [...tempUrlList];
+    
+    // If there's a current URL input that's valid and not already in temp list, add it
+    if (currentUrl && currentUrl !== 'http://' && currentUrl !== 'https://' && !tempUrlList.includes(currentUrl)) {
+      allUrls = [...allUrls, currentUrl];
+    }
+    
+    if (allUrls.length === 0) {
+      modalToastStore.error('Please add at least one URL');
+      return;
+    }
+    
+    // Add all URLs (temp list + current input) to main media items
+    const newUrlItems = allUrls.map((url, index) => {
+      return {
+        id: Date.now().toString() + '_url_' + index,
+        type: 'url' as const,
+        url: url,
+        createdAt: new Date()
+      };
+    });
+    
+    mediaItems = [...mediaItems, ...newUrlItems];
+    
+    // Show success message
+    modalToastStore.success(`Added ${allUrls.length} URL(s) to the list`);
+    
+    // Reset temp list and close modal
+    tempUrlList = [];
+    urlInput = 'http://';
+    showMediaForm = false;
+    currentMediaType = null;
+  }
 
   function cancelMediaForm() {
     showMediaForm = false;
@@ -466,6 +546,7 @@
     selectedFile = null;
     urlInput = 'http://';
     textInput = '';
+    tempUrlList = [];
   }
 
   function toggleDocumentDropdown() {
@@ -502,7 +583,7 @@
   }
 </script>
 
-<div class="p-6 relative">
+<div class="px-6 py-8 relative">
   <!-- Loading Overlay -->
   {#if isSubmitting}
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
@@ -546,7 +627,7 @@
   {/if}
   
   <div class="max-w-6xl mx-auto">
-    <form bind:this={formRef} class="space-y-6" onsubmit={handleSubmit}>
+    <form bind:this={formRef} class="space-y-8 mt-4" onsubmit={handleSubmit}>
       <!-- Document Selection -->
       <div class="relative">
         <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -864,6 +945,7 @@
                 type="button"
                 onclick={cancelMediaForm}
                 class="text-gray-400 hover:text-gray-600"
+                aria-label="Close media form"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -873,17 +955,68 @@
 
             <div class="space-y-4">
               {#if currentMediaType === 'url'}
-                <!-- URL Input -->
+                <!-- URL Multiple Input -->
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">
-                    URL *
+                    URL Links
                   </label>
-                  <input
-                    type="url"
-                    bind:value={urlInput}
-                    placeholder="https://example.com"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  
+                  <!-- URL Input with Add Button -->
+                  <div class="flex space-x-2 mb-3">
+                    <input
+                      type="url"
+                      bind:value={urlInput}
+                      placeholder="https://example.com"
+                      class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onkeypress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addUrlToTempList();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onclick={addUrlToTempList}
+                      class="px-4 py-2 text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-md transition-all duration-200 flex items-center justify-center min-w-[60px] shadow-sm hover:shadow-md"
+                      title="Add URL to list"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <!-- Temporary URL List -->
+                  {#if tempUrlList.length > 0}
+                    <div class="bg-gray-50 border border-gray-200 rounded-md p-3 mb-3">
+                      <h4 class="text-sm font-medium text-gray-700 mb-2">URLs to Add ({tempUrlList.length})</h4>
+                      <div class="space-y-2 max-h-32 overflow-y-auto">
+                        {#each tempUrlList as url, index (index)}
+                          <div class="flex items-center justify-between bg-white p-2 rounded border">
+                            <span class="text-sm text-gray-900 truncate flex-1 mr-2" title={url}>
+                              {url.length > 40 ? url.substring(0, 40) + '...' : url}
+                            </span>
+                            <button
+                              type="button"
+                              onclick={() => removeUrlFromTempList(index)}
+                              class="text-red-500 hover:text-red-700 p-1 rounded"
+                              title="Remove URL"
+                              aria-label="Remove URL from list"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="text-sm text-gray-500 italic mb-3">
+                      Add URLs using the "+" button, then click "Add Links" to add all URLs to the main list
+                    </div>
+                  {/if}
                 </div>
               {:else if currentMediaType === 'notes'}
                 <!-- Notes Text Input -->
@@ -902,60 +1035,85 @@
                 <!-- File Input -->
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {currentMediaType === 'audio' ? 'Audio' : 'Video'} File *
+                    {currentMediaType === 'audio' ? 'Audio' : 'Video'} Files *
                   </label>
                   <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
                     <input
                       type="file"
                       accept={currentMediaType === 'audio' ? '.mp3,.m4a,.wav,.aac' : '.mp4,.avi,.mov,.wmv,.mkv'}
+                      multiple
                       onchange={handleFileSelect}
                       class="hidden"
                       id="mediaFileInput"
                     />
                     <label for="mediaFileInput" class="cursor-pointer">
-                      {#if selectedFile}
-                        <div class="flex items-center justify-center space-x-2">
-                          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span class="text-sm text-gray-900">{selectedFile.name}</span>
-                          <span class="text-xs text-gray-500">({Math.round(selectedFile.size / 1024 / 1024 * 100) / 100} MB)</span>
-                        </div>
-                      {:else}
-                        <div>
-                          <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                          </svg>
-                          <p class="mt-2 text-sm text-gray-600">
-                            Click to select {currentMediaType} file
-                          </p>
-                          <p class="text-xs text-gray-500">
-                            {currentMediaType === 'audio' ? 'MP3, M4A, WAV, AAC' : 'MP4, AVI, MOV, WMV, MKV'}
-                          </p>
-                        </div>
-                      {/if}
+                      <div>
+                        <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p class="mt-2 text-sm text-gray-600 font-medium">
+                          Click to select {currentMediaType} files
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">
+                          {currentMediaType === 'audio' ? 'MP3, M4A, WAV, AAC' : 'MP4, AVI, MOV, WMV, MKV'}
+                        </p>
+                        <p class="text-xs text-blue-600 font-medium mt-2">
+                          Multiple files supported - Auto-adds to list
+                        </p>
+                      </div>
                     </label>
                   </div>
                 </div>
               {/if}
 
               <!-- Form Actions -->
-              <div class="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onclick={cancelMediaForm}
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onclick={addMediaItem}
-                  class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
-                >
-                  Add {currentMediaType === 'url' ? 'Link' : currentMediaType === 'notes' ? 'Notes' : 'File'}
-                </button>
-              </div>
+              {#if currentMediaType === 'url'}
+                <div class="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onclick={cancelMediaForm}
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onclick={addAllUrlsToMainList}
+                    disabled={tempUrlList.length === 0 && (urlInput.trim() === '' || urlInput.trim() === 'http://' || urlInput.trim() === 'https://')}
+                    class="px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed rounded-md transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                  >
+                    Add Links ({tempUrlList.length + ((urlInput.trim() && urlInput.trim() !== 'http://' && urlInput.trim() !== 'https://' && !tempUrlList.includes(urlInput.trim())) ? 1 : 0)})
+                  </button>
+                </div>
+              {:else if currentMediaType === 'notes'}
+                <div class="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onclick={cancelMediaForm}
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onclick={addMediaItem}
+                    class="px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-md transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                  >
+                    Add Notes
+                  </button>
+                </div>
+              {:else}
+                <!-- For audio/video files, just show cancel since files auto-add -->
+                <div class="flex justify-end">
+                  <button
+                    type="button"
+                    onclick={cancelMediaForm}
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              {/if}
             </div>
           </div>
         {/if}
@@ -969,7 +1127,6 @@
                 <thead class="bg-gray-50">
                   <tr>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -1022,36 +1179,15 @@
                           {/if}
                         </div>
                       </td>
-                      <td class="px-4 py-3">
-                        <div class="text-sm text-gray-600">
-                          {#if item.type === 'notes'}
-                            <span class="text-gray-400 italic">Text Content</span>
-                          {:else}
-                            <span class="text-gray-400 italic">Media File</span>
-                          {/if}
-                        </div>
-                      </td>
                       <td class="px-4 py-3 whitespace-nowrap">
                         <div class="flex items-center space-x-2">
-                          {#if item.isExisting}
-                            <button
-                              type="button"
-                              onclick={() => replaceExistingReport(item)}
-                              disabled={isFormDisabled}
-                              class="text-blue-600 hover:text-blue-800 p-1 rounded disabled:opacity-50"
-                              title="Replace this report"
-                            >
-                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                            </button>
-                          {/if}
                           <button
                             type="button"
                             onclick={() => removeMediaItem(item.id)}
                             disabled={isFormDisabled}
                             class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
-                            title={item.isExisting ? "Delete from server" : "Remove item"}
+                            title="Remove item"
+                            aria-label="Remove media item"
                           >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
