@@ -3,7 +3,7 @@ const documentReportRepository = require("../repositories/documentReportReposito
 const documentRepository = require("../repositories/documentRepository");
 const minioClient = require("../../config/minioClient");
 const { minio } = require("../../config/dotenv");
-const { streamMedia } = require("../utils/minioHelper");
+const { streamMedia, deleteReportMedia } = require("../utils/minioHelper");
 
 // ✅ Get all document reports
 exports.getAllReports = async (params) => {
@@ -82,6 +82,14 @@ exports.updateReport = async (id, data, user) => {
     };
   }
 
+  // 🗑️ Delete old media file if new media is uploaded
+  if (data.content && data.original_name && existing.content) {
+    const oldFileType = existing.type;
+    if (oldFileType === "AUDIO" || oldFileType === "VIDEO") {
+      await deleteReportMedia(existing.content);
+    }
+  }
+
   if (data.content || data.original_name) {
     data.is_downloaded = false;
     data.downloaded_at = null;
@@ -99,6 +107,15 @@ exports.updateReport = async (id, data, user) => {
 
 // ❌ Delete report
 exports.deleteReport = async (id) => {
+  // Get report data before deletion to access file info
+  const existing = await documentReportRepository.findReportById(id);
+  if (existing && existing.content) {
+    const fileType = existing.type;
+    if (fileType === "AUDIO" || fileType === "VIDEO") {
+      await deleteReportMedia(existing.content);
+    }
+  }
+  
   return await documentReportRepository.deleteReport(id);
 };
 

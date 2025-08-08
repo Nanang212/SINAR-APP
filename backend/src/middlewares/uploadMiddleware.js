@@ -71,7 +71,7 @@ const uploadToMinio = (fieldName) => {
   ];
 };
 
-// 🎵 Upload audio/video (pakai original name sebagai filename di MinIO)
+// 🎵 Upload audio/video (pakai UUID sebagai filename di MinIO)
 const uploadMediaToMinio = (
   fields = ["video", "audio"],
   subfolder = "report"
@@ -98,7 +98,8 @@ const uploadMediaToMinio = (
             });
           }
 
-          const filename = file.originalname;
+          const extension = path.extname(file.originalname);
+          const filename = `${uuidv4()}${extension}`;
           const objectName = subfolder ? `${subfolder}/${filename}` : filename;
 
           await minioClient.putObject(
@@ -152,7 +153,8 @@ const conditionalUploadMedia = (
             });
           }
 
-          const filename = file.originalname;
+          const extension = path.extname(file.originalname);
+          const filename = `${uuidv4()}${extension}`;
           const objectName = subfolder ? `${subfolder}/${filename}` : filename;
 
           await minioClient.putObject(
