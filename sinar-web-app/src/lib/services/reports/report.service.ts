@@ -620,6 +620,82 @@ class ReportService {
   }
 
   /**
+   * Update existing report with specific type and content
+   */
+  async updateReportWithTypeAndContent(
+    id: string | number, 
+    type: 'audio' | 'video' | 'link' | 'text',
+    content: string | File,
+    description?: string
+  ): Promise<ApiResponse<Report>> {
+    try {
+      const formData = new FormData();
+      
+      // Add required parameters
+      formData.append('type', type);
+      
+      if (description) {
+        formData.append('description', description);
+      }
+      
+      // Handle content based on type
+      if (type === 'audio' || type === 'video') {
+        // For audio/video, content should be a File
+        if (content instanceof File) {
+          formData.append('content', content);
+        } else {
+          throw new Error(`Content must be a File for ${type} type`);
+        }
+      } else if (type === 'link' || type === 'text') {
+        // For link/text, content should be a string
+        if (typeof content === 'string') {
+          formData.append('content', content);
+        } else {
+          throw new Error(`Content must be a string for ${type} type`);
+        }
+      }
+
+      const response = await httpClient.authenticatedRequest<ReportsResponse>(
+        `${this.adminBaseEndpoint}/${id}`,
+        {
+          method: 'PUT',
+          body: formData,
+        }
+      );
+
+      console.log('Report service - update with type response:', response);
+      
+      if (response.status && response.data) {
+        const report = response.data.data || response.data;
+        const singleReport = Array.isArray(report) ? report[0] : report;
+        
+        if (singleReport) {
+          return {
+            status: true,
+            code: response.code,
+            message: response.message,
+            data: singleReport,
+          };
+        }
+      }
+
+      return {
+        status: false,
+        code: response.code,
+        message: response.message || 'Failed to update report',
+        error: response.error || 'Failed to update report',
+      };
+    } catch (error) {
+      return {
+        status: false,
+        code: 0,
+        message: 'Failed to update report',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Delete report by ID
    */
   async deleteReport(id: string | number): Promise<ApiResponse<any>> {
@@ -744,6 +820,173 @@ class ReportService {
     } catch (error) {
       console.error('Failed to download audio:', error);
       throw new Error(error instanceof Error ? error.message : 'Download failed');
+    }
+  }
+
+  /**
+   * Download report file by ID (for audio and video) with authentication
+   */
+  async downloadReportById(id: string | number, originalName?: string): Promise<void> {
+    try {
+      // Create a temporary form to download with authentication
+      const response = await httpClient.authenticatedRequest<Blob>(
+        `${this.adminBaseEndpoint}/download/${id}`,
+        {
+          method: 'GET',
+          responseType: 'blob'
+        }
+      );
+
+      if (response.status && response.data instanceof Blob) {
+        const url = window.URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Use original name if provided, otherwise try to get filename from Content-Disposition header
+        let filename = originalName || `report_${id}`;
+        const contentDisposition = (response as any).headers?.get('Content-Disposition') || 
+                                   (response as any).headers?.get('content-disposition');
+        
+        if (contentDisposition) {
+          // Try different patterns for filename extraction
+          const patterns = [
+            /filename[^;=\n]*=\s*"([^"]+)"/i,
+            /filename[^;=\n]*=\s*'([^']+)'/i,
+            /filename[^;=\n]*=\s*([^;\n]+)/i,
+            /filename\*=UTF-8''([^;\n]+)/i
+          ];
+          
+          for (const pattern of patterns) {
+            const match = contentDisposition.match(pattern);
+            if (match && match[1]) {
+              filename = decodeURIComponent(match[1].trim());
+              break;
+            }
+          }
+        }
+        
+        // If no filename from header and no original name, try to detect from blob type
+        if (!originalName && filename === `report_${id}`) {
+          const blobType = response.data.type;
+          console.log('Blob MIME type:', blobType);
+          
+          if (blobType.includes('audio')) {
+            filename = `report_${id}.mp3`; // Default audio extension
+            if (blobType.includes('mp3')) filename = `report_${id}.mp3`;
+            else if (blobType.includes('m4a')) filename = `report_${id}.m4a`;
+            else if (blobType.includes('wav')) filename = `report_${id}.wav`;
+            else if (blobType.includes('aac')) filename = `report_${id}.aac`;
+          } else if (blobType.includes('video')) {
+            filename = `report_${id}.mp4`; // Default video extension
+            if (blobType.includes('mp4')) filename = `report_${id}.mp4`;
+            else if (blobType.includes('avi')) filename = `report_${id}.avi`;
+            else if (blobType.includes('mov')) filename = `report_${id}.mov`;
+            else if (blobType.includes('wmv')) filename = `report_${id}.wmv`;
+            else if (blobType.includes('mkv')) filename = `report_${id}.mkv`;
+          }
+        }
+        
+        console.log('Final filename:', filename);
+        console.log('Content-Disposition:', contentDisposition);
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        throw new Error(response.message || 'Download failed');
+      }
+    } catch (error) {
+      console.error('Failed to download report:', error);
+      throw new Error(error instanceof Error ? error.message : 'Download failed');
+    }
+  }
+
+  /**
+   * Get preview URL for report file
+   */
+  getPreviewUrl(id: string | number): string {
+    return `${this.adminBaseEndpoint}/preview/${id}`;
+  }
+
+  /**
+   * Get audio blob for preview with authentication
+   */
+  async getAudioBlob(id: string | number): Promise<Blob> {
+    try {
+      const response = await httpClient.authenticatedRequest<Blob>(
+        `${this.adminBaseEndpoint}/preview/${id}`,
+        {
+          method: 'GET',
+          responseType: 'blob'
+        }
+      );
+
+      if (response.status && response.data instanceof Blob) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to get audio blob');
+      }
+    } catch (error) {
+      console.error('Failed to get audio blob:', error);
+      throw new Error(error instanceof Error ? error.message : 'Failed to get audio blob');
+    }
+  }
+
+  /**
+   * Get video blob for preview with authentication
+   */
+  async getVideoBlob(id: string | number): Promise<Blob> {
+    try {
+      const response = await httpClient.authenticatedRequest<Blob>(
+        `${this.adminBaseEndpoint}/preview/${id}`,
+        {
+          method: 'GET',
+          responseType: 'blob'
+        }
+      );
+
+      if (response.status && response.data instanceof Blob) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to get video blob');
+      }
+    } catch (error) {
+      console.error('Failed to get video blob:', error);
+      throw new Error(error instanceof Error ? error.message : 'Failed to get video blob');
+    }
+  }
+
+  /**
+   * Preview report file by ID (for audio and video) with authentication
+   */
+  async previewReportById(id: string | number): Promise<void> {
+    try {
+      // Get the blob data with authentication
+      const response = await httpClient.authenticatedRequest<Blob>(
+        `${this.adminBaseEndpoint}/preview/${id}`,
+        {
+          method: 'GET',
+          responseType: 'blob'
+        }
+      );
+
+      if (response.status && response.data instanceof Blob) {
+        const url = window.URL.createObjectURL(response.data);
+        window.open(url, '_blank');
+        
+        // Clean up the object URL after a short delay
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+      } else {
+        throw new Error(response.message || 'Preview failed');
+      }
+    } catch (error) {
+      console.error('Failed to preview report:', error);
+      throw new Error(error instanceof Error ? error.message : 'Preview failed');
     }
   }
 }

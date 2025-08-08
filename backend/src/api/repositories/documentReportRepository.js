@@ -78,7 +78,7 @@ exports.findAllReports = async (params) => {
     },
     orderBy: [
       {
-        document_id: order.toLowerCase() === "desc" ? "desc" : "asc",
+        updated_at: order.toLowerCase() === "desc" ? "desc" : "asc",
       },
       {
         id: "desc" // Always descending for report id
@@ -138,13 +138,29 @@ exports.findAllReports = async (params) => {
     groupedByDocument[documentKey].reports[type].push(reportItem);
   }
 
-  // Convert to array and sort by document_id
+  // Convert to array and sort by latest updated_at from each document group
   const groupedArray = Object.values(groupedByDocument);
   const sortedGroups = groupedArray.sort((a, b) => {
+    // Get the latest updated_at from all reports in each document group
+    const getLatestUpdatedAt = (documentGroup) => {
+      let latestDate = null;
+      Object.values(documentGroup.reports).forEach(reportTypeArray => {
+        reportTypeArray.forEach(report => {
+          if (!latestDate || new Date(report.updated_at) > new Date(latestDate)) {
+            latestDate = report.updated_at;
+          }
+        });
+      });
+      return latestDate ? new Date(latestDate) : new Date(0);
+    };
+
+    const aLatestUpdate = getLatestUpdatedAt(a);
+    const bLatestUpdate = getLatestUpdatedAt(b);
+
     if (order.toLowerCase() === "desc") {
-      return b.document.id - a.document.id;
+      return bLatestUpdate - aLatestUpdate;
     }
-    return a.document.id - b.document.id;
+    return aLatestUpdate - bLatestUpdate;
   });
 
   // Apply pagination to grouped documents

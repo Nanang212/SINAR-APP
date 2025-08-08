@@ -1032,17 +1032,32 @@
                         </div>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onclick={() => removeMediaItem(item.id)}
-                          disabled={isFormDisabled}
-                          class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
-                          title="Remove item"
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                        <div class="flex items-center space-x-2">
+                          {#if item.isExisting}
+                            <button
+                              type="button"
+                              onclick={() => replaceExistingReport(item)}
+                              disabled={isFormDisabled}
+                              class="text-blue-600 hover:text-blue-800 p-1 rounded disabled:opacity-50"
+                              title="Replace this report"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                          {/if}
+                          <button
+                            type="button"
+                            onclick={() => removeMediaItem(item.id)}
+                            disabled={isFormDisabled}
+                            class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                            title={item.isExisting ? "Delete from server" : "Remove item"}
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   {/each}

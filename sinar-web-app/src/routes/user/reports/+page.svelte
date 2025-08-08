@@ -8,6 +8,7 @@
   let searchTerm = $state("");
   let sortOrder = $state<'asc' | 'desc'>('desc');
   let isLoading = $state(false);
+  let selectedReportData = $state<any>(null);
 
   function handleTabChange(tab: string) {
     console.log('Page: Received tab change to:', tab);
@@ -48,6 +49,13 @@
 
   function handleFormReset() {
     console.log('Report form reset');
+    selectedReportData = null;
+  }
+
+  function handleRowClick(reportData: any) {
+    console.log('Row clicked, switching to input tab with data:', reportData);
+    selectedReportData = reportData;
+    activeTab = "input";
   }
 </script>
 
@@ -61,7 +69,7 @@
     <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 z-10 rounded-t-lg"></div>
     
     <!-- Fixed Header with Tabs -->
-    <div class="absolute top-1 left-0 right-0 bg-white z-20 border-b border-gray-200 shadow-sm">
+    <div class="absolute top-1 left-0 right-0 bg-white z-30 border-b border-gray-200 shadow-sm">
       <div class="px-6 pt-5 pb-4">
         <ReportTabs 
           {activeTab}
@@ -77,17 +85,19 @@
     </div>
     
     <!-- Tab Content -->
-    <div class="absolute inset-0 pt-[160px] overflow-y-auto overflow-x-hidden">
+    <div class="absolute inset-0 pt-[120px] sm:pt-[130px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
       {#if activeTab === "input"}
         <ReportForm 
           onSubmit={handleFormSubmit}
           onReset={handleFormReset}
+          reportData={selectedReportData}
         />
       {:else if activeTab === "browse"}
         <ReportListTable 
           bind:this={reportTableRef}
           fetchOnMount={true}
           onRefresh={() => console.log('Reports refreshed')}
+          onRowClick={handleRowClick}
           {searchTerm}
           {sortOrder}
         />

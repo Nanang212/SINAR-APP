@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { reportService, type Report, type PaginationParams } from '$lib/services';
+  import ReportDetailModal from '$lib/components/ui/ReportDetailModal.svelte';
 
   // Transform API Document to display format
   interface DisplayDocument {
@@ -9,6 +10,7 @@
     document_original_name: string;
     document_url: string;
     created_at: string;
+    description: string;
     textCount: number;
     linkCount: number;
     audioCount: number;
@@ -47,6 +49,10 @@
   // Pagination state
   let totalRecords = $state(0);
   let totalPages = $state(0);
+  
+  // Modal state
+  let isModalOpen = $state(false);
+  let selectedReportData = $state<any | null>(null);
 
   // Backend handles search and sorting
   const paginatedData = $derived(() => documents);
@@ -65,15 +71,20 @@
     const videoCount = reports.VIDEO?.length || 0;
     const totalCount = textCount + linkCount + audioCount + videoCount;
     
-    // Get latest created_at from all reports for sorting
+    // Get latest created_at and description from all reports for sorting and display
     let latestCreatedAt = '';
+    let latestDescription = '';
+    let latestReport = null;
+    
     ['TEXT', 'LINK', 'AUDIO', 'VIDEO'].forEach(type => {
       if (reports[type] && reports[type].length > 0) {
         const latestInType = reports[type].reduce((latest: any, current: any) => 
-          new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+          new Date(current.updated_at || current.created_at) > new Date(latest.updated_at || latest.created_at) ? current : latest
         );
-        if (!latestCreatedAt || new Date(latestInType.created_at) > new Date(latestCreatedAt)) {
+        if (!latestReport || new Date(latestInType.updated_at || latestInType.created_at) > new Date(latestReport.updated_at || latestReport.created_at)) {
+          latestReport = latestInType;
           latestCreatedAt = latestInType.created_at;
+          latestDescription = latestInType.description || '';
         }
       }
     });
@@ -84,6 +95,7 @@
       document_original_name: document.original_name || 'unknown.file',
       document_url: document.url || '',
       created_at: latestCreatedAt ? formatDate(latestCreatedAt) : '-',
+      description: latestDescription || '-',
       textCount,
       linkCount,
       audioCount,
@@ -96,13 +108,14 @@
   function formatDate(dateString: string): string {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('id-ID', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      
+      return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
     } catch (error) {
       return dateString;
     }
@@ -241,8 +254,60 @@
     const apiDocument = apiDocuments.find(apiDoc => apiDoc.document.id.toString() === document.id);
     
     if (apiDocument && onRowClick) {
-      onRowClick(apiDocument);
+      // Get the latest report from all types based on updated_at/created_at
+      let latestReport = null;
+      
+      ['TEXT', 'LINK', 'AUDIO', 'VIDEO'].forEach(type => {
+        if (apiDocument.reports[type] && apiDocument.reports[type].length > 0) {
+          const latestInType = apiDocument.reports[type].reduce((latest: any, current: any) => 
+            new Date(current.updated_at || current.created_at) > new Date(latest.updated_at || latest.created_at) ? current : latest
+          );
+          if (!latestReport || new Date(latestInType.updated_at || latestInType.created_at) > new Date(latestReport.updated_at || latestReport.created_at)) {
+            latestReport = latestInType;
+          }
+        }
+      });
+
+      if (latestReport) {
+        // Prepare the report data for form pre-filling with all reports
+        const formReportData = {
+          id: latestReport.id,
+          document_id: apiDocument.document.id,
+          description: latestReport.description || '',
+          type: latestReport.type,
+          content: latestReport.content,
+          original_name: latestReport.original_name,
+          created_at: latestReport.created_at,
+          updated_at: latestReport.updated_at,
+          // Include document info for context
+          document: {
+            id: apiDocument.document.id,
+            title: apiDocument.document.original_name,
+            original_name: apiDocument.document.original_name,
+            is_downloaded: apiDocument.document.is_downloaded || false
+          },
+          // Include all reports for this document
+          allReports: apiDocument.reports
+        };
+        
+        onRowClick(formReportData);
+      }
     }
+  }
+
+  function openDetailModal(document: DisplayDocument) {
+    // Find the corresponding API document
+    const apiDocument = apiDocuments.find(apiDoc => apiDoc.document.id.toString() === document.id);
+    
+    if (apiDocument) {
+      selectedReportData = apiDocument;
+      isModalOpen = true;
+    }
+  }
+
+  function closeDetailModal() {
+    isModalOpen = false;
+    selectedReportData = null;
   }
 
   // Format media counts untuk display (hanya yang > 0)
@@ -303,7 +368,7 @@
 
 </script>
 
-<div class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-8 sm:pt-12">
+<div class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-6 sm:pt-10">
   <!-- Error State -->
   {#if error}
     <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
@@ -337,13 +402,16 @@
     <div class="flex-1 pr-0 sm:pr-4 overflow-auto">
       <div class="mt-16 sm:mt-8">
       <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
-      <thead class="bg-gray-50 sticky top-6 sm:top-2 z-10">
+      <thead class="bg-gray-50 sticky top-12 sm:-top-1 z-10">
         <tr>
           <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[220px] sm:min-w-[180px]">
             Document
           </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[200px] sm:min-w-[180px]">
+            Description
+          </th>
           <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[200px] sm:min-w-[160px]">
-            Media Content
+            Content Report
           </th>
           <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]">
             Latest Report
@@ -371,6 +439,17 @@
               </div>
             </td>
             
+            <!-- Description Column -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
+              <div class="text-sm text-gray-900">
+                {#if document.description && document.description !== '-'}
+                  <span class="truncate" title={document.description}>{document.description}</span>
+                {:else}
+                  <span class="text-gray-400 italic">No description</span>
+                {/if}
+              </div>
+            </td>
+            
             <!-- Media Content Column -->
             <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
               <div class="flex flex-wrap gap-1">
@@ -394,40 +473,20 @@
             
             <!-- Actions -->
             <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
-              <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
+              <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
                 <!-- View Details Button -->
                 <div class="relative group">
                   <button
-                    onclick={() => console.log('View details', document)}
-                    class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                    onclick={() => openDetailModal(document)}
+                    class="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
                     aria-label="View details"
                   >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </button>
-                  <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-5">
-                    View Details
-                  </div>
-                </div>
-
-                <!-- Divider -->
-                <div class="h-6 w-px bg-gray-300"></div>
-
-                <!-- Download Document Button -->
-                <div class="relative group">
-                  <button
-                    onclick={() => window.open(document.document_url, '_blank')}
-                    class="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-                    aria-label="Download document"
-                  >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m5-7V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-1" />
-                    </svg>
-                  </button>
-                  <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-5">
-                    Download Document
+                  <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                    Detail
                   </div>
                 </div>
               </div>
@@ -536,3 +595,10 @@
     </div>
   {/if}
 </div>
+
+<!-- Report Detail Modal -->
+<ReportDetailModal 
+  isOpen={isModalOpen}
+  reportData={selectedReportData}
+  onClose={closeDetailModal}
+/>
