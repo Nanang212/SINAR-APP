@@ -168,9 +168,23 @@ exports.updateReport = async (req, res) => {
       // Update selain file (e.g. TEXT, LINK, atau hanya deskripsi)
       const updateData = {
         description: req.body.description,
-        content: req.body.content || req.body.link || req.body.text || null,
-        type: req.body.type?.toUpperCase() || null,
       };
+
+      // Auto-detect type berdasarkan field yang dikirim
+      if (req.body.link) {
+        updateData.type = "LINK";
+        updateData.content = req.body.link;
+      } else if (req.body.text) {
+        updateData.type = "TEXT";
+        updateData.content = req.body.text;
+      } else if (req.body.content) {
+        // Fallback jika menggunakan field 'content' langsung
+        updateData.content = req.body.content;
+        if (req.body.type) {
+          updateData.type = req.body.type.toUpperCase();
+        }
+      }
+      // Jika tidak ada field content/link/text, hanya update description
 
       const result = await documentReportService.updateReport(
         id,

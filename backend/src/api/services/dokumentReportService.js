@@ -82,15 +82,22 @@ exports.updateReport = async (id, data, user) => {
     };
   }
 
-  // 🗑️ Delete old media file if new media is uploaded
-  if (data.content && data.original_name && existing.content) {
-    const oldFileType = existing.type;
-    if (oldFileType === "AUDIO" || oldFileType === "VIDEO") {
+  // 🗑️ Delete old media file jika:
+  // 1. Ada file media baru (AUDIO/VIDEO) yang mengganti file lama
+  // 2. Type berubah dari AUDIO/VIDEO ke TEXT/LINK
+  const isUploadingNewMedia = data.content && data.original_name;
+  const isChangingFromMediaToText = data.type && 
+    ["TEXT", "LINK"].includes(data.type) && 
+    ["AUDIO", "VIDEO"].includes(existing.type);
+  
+  if (existing.content && ["AUDIO", "VIDEO"].includes(existing.type)) {
+    if (isUploadingNewMedia || isChangingFromMediaToText) {
       await deleteReportMedia(existing.content);
     }
   }
 
-  if (data.content || data.original_name) {
+  // Reset download status jika ada perubahan content atau type
+  if (data.content || data.original_name || isChangingFromMediaToText) {
     data.is_downloaded = false;
     data.downloaded_at = null;
   }
