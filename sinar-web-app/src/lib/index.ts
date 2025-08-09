@@ -24,6 +24,7 @@ export { default as DashboardSidebar } from "@/lib/components/dashboard/Dashboar
 export { default as DashboardStats } from "@/lib/components/dashboard/DashboardStats.svelte";
 export { default as RecentActivity } from "@/lib/components/dashboard/RecentActivity.svelte";
 export { default as QuickActions } from "@/lib/components/dashboard/QuickActions.svelte";
+export { default as Dashboard } from "@/lib/components/dashboard/Dashboard.svelte";
 
 // Stores
 export { toastStore } from "@/lib/stores/toast";

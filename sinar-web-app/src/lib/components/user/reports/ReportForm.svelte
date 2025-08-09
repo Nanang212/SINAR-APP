@@ -86,6 +86,7 @@
   let editingItem = $state<MediaItem | null>(null); // Currently editing item
   let showEditModal = $state(false); // Show edit modal for individual items
   let deletedItems = $state<MediaItem[]>([]); // Items marked for deletion (batch delete)
+  let originalDescription = $state<string>(''); // Original description from server for comparison
   
   // Confirmation modal states
   let showCancelOperationModal = $state(false);
@@ -343,6 +344,7 @@
     
     // Set form values
     mediaItems = allMediaItems;
+    originalDescription = latestDescription; // Store original description for comparison
     (formRef.querySelector('#description') as HTMLTextAreaElement).value = latestDescription;
   }
 
@@ -480,18 +482,60 @@
     // Don't show additional error messages as they were already shown immediately
   }
 
+  // Update description only for items that don't have content changes
+  async function updateDescriptionOnly(description: string, itemsToUpdate: MediaItem[]) {
+    let successCount = 0;
+    let failedItems: string[] = [];
+    
+    for (const item of itemsToUpdate) {
+      if (!item.reportId) {
+        console.error('Missing reportId for description update:', item);
+        failedItems.push(item.type);
+        continue;
+      }
+      
+      try {
+        // Use reportService to update description only
+        const result = await reportService.updateReport(item.reportId, {
+          description: description
+        });
+        
+        if (result.status) {
+          successCount++;
+          console.log(`✅ Successfully updated description for ${item.type} (ID: ${item.reportId})`);
+        } else {
+          failedItems.push(item.type);
+          console.error(`❌ Failed to update description for ${item.type} - ${result.message}`);
+        }
+      } catch (error) {
+        failedItems.push(item.type);
+        console.error(`❌ Error updating description for ${item.type}:`, error);
+      }
+    }
+    
+    return { successCount, failedItems };
+  }
+
   async function handleBatchUpdate(description: string) {
-    // Filter items that have changes
+    // Check if description has changed
+    const isDescriptionChanged = description !== originalDescription;
+    
+    // Filter items that have content changes  
     const changedItems = mediaItems.filter(item => item.hasChanges === true);
     
-    if (changedItems.length === 0 && deletedItems.length === 0) {
+    // Get items that need description-only updates (not deleted, not content-changed)
+    const itemsNotDeleted = mediaItems.filter(item => !deletedItems.some(deletedItem => deletedItem.id === item.id));
+    const descriptionOnlyItems = itemsNotDeleted.filter(item => !item.hasChanges);
+    
+    // Check if there are any operations needed
+    if (changedItems.length === 0 && deletedItems.length === 0 && !isDescriptionChanged) {
       modalToastStore.success('No changes to save');
       return;
     }
 
-    // Calculate total operations (updates + deletes)
-    const totalOperations = changedItems.length + deletedItems.length;
-    uploadProgress.total = totalOperations;
+    // Calculate progress counter (exclude description-only updates)
+    const progressOperations = changedItems.length + deletedItems.length;
+    uploadProgress.total = progressOperations;
     uploadProgress.current = 0;
 
     let successCount = 0;
@@ -633,18 +677,41 @@
       deletedItems = [];
     }
 
+    // Process description updates for remaining items (not counted in progress)
+    let descriptionSuccessCount = 0;
+    if (isDescriptionChanged && descriptionOnlyItems.length > 0) {
+      console.log(`Updating description for ${descriptionOnlyItems.length} items (not counted in progress)`);
+      const descriptionResult = await updateDescriptionOnly(description, descriptionOnlyItems);
+      descriptionSuccessCount = descriptionResult.successCount;
+      
+      if (descriptionResult.failedItems.length > 0) {
+        console.warn('Some description updates failed:', descriptionResult.failedItems);
+      }
+    }
+
     // Show final results
     const totalSuccessful = successCount + deletedCount;
     
-    if (totalSuccessful > 0 && failedItems.length === 0) {
+    if ((totalSuccessful > 0 || descriptionSuccessCount > 0) && failedItems.length === 0) {
       let message = '';
-      if (successCount > 0 && deletedCount > 0) {
-        message = `Successfully updated ${successCount} item(s) and deleted ${deletedCount} item(s)!`;
-      } else if (successCount > 0) {
-        message = `Successfully updated ${successCount} item(s)!`;
-      } else if (deletedCount > 0) {
-        message = `Successfully deleted ${deletedCount} item(s)!`;
+      const parts = [];
+      
+      if (successCount > 0) {
+        parts.push(`updated ${successCount} content item(s)`);
       }
+      if (deletedCount > 0) {
+        parts.push(`deleted ${deletedCount} item(s)`);
+      }
+      if (descriptionSuccessCount > 0) {
+        parts.push(`updated description for ${descriptionSuccessCount} item(s)`);
+      }
+      
+      if (parts.length > 0) {
+        message = `Successfully ${parts.join(', ')}!`;
+      } else {
+        message = 'Update completed successfully!';
+      }
+      
       modalToastStore.success(message + ' Form is now disabled. Click "Reset" to make new changes or select new data from browse.');
       
       // Disable form after successful update
@@ -659,6 +726,7 @@
     mediaItems = [];
     deletedItems = [];
     uploadProgress = { current: 0, total: 0, currentFile: '' };
+    originalDescription = ''; // Reset original description
     isDocumentDropdownOpen = false;
     isFormDisabled = false;
     isUpdateCompleted = false; // Reset update completion state
