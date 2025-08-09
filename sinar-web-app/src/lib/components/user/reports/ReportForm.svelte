@@ -47,6 +47,7 @@
     isExisting?: boolean; // Flag to indicate this is an existing report
     downloadUrl?: string;
     previewUrl?: string;
+    hasChanges?: boolean; // Flag to indicate this item has been modified
   }
   
   let mediaItems = $state<MediaItem[]>([]);
@@ -519,6 +520,31 @@
     textInput = '';
   }
 
+  function handleEditFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    
+    if (files && files.length > 0) {
+      const file = files[0]; // Only take first file in edit mode
+      const fileName = file.name.toLowerCase();
+      
+      // Validate file type
+      const allowedExtensions = currentMediaType === 'audio' 
+        ? ['.mp3', '.m4a', '.wav', '.aac']
+        : ['.mp4', '.avi', '.mov', '.wmv', '.mkv'];
+      
+      const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (isValidType) {
+        selectedFile = file;
+        modalToastStore.success(`File selected: ${file.name}`);
+      } else {
+        modalToastStore.error(`Invalid file type. Allowed: ${allowedExtensions.join(', ')}`);
+        input.value = ''; // Clear invalid selection
+      }
+    }
+  }
+
   function handleFileSelect(event: Event) {
     const input = event.target as HTMLInputElement;
     const files = input.files;
@@ -708,79 +734,68 @@
     showEditModal = true;
   }
   
-  async function saveEditedItem() {
-    if (!editingItem?.reportId) return;
+  function saveEditedItem() {
+    if (!editingItem) return;
     
-    try {
-      isFormDisabled = true;
-      
-      let content: string | File;
-      let type: 'audio' | 'video' | 'link' | 'text';
-      
-      // Prepare content and type based on editing item type
-      if (editingItem.type === 'url') {
-        type = 'link';
-        content = urlInput.trim();
-        if (!content || content === 'http://' || content === 'https://') {
-          modalToastStore.error('Please enter a valid URL');
-          return;
-        }
-      } else if (editingItem.type === 'notes') {
-        type = 'text';
-        content = textInput.trim();
-        if (!content) {
-          modalToastStore.error('Please enter notes content');
-          return;
-        }
-      } else if (editingItem.type === 'audio' || editingItem.type === 'video') {
-        type = editingItem.type;
-        if (!selectedFile) {
-          modalToastStore.error(`Please select a ${editingItem.type} file`);
-          return;
-        }
-        content = selectedFile;
-      } else {
-        modalToastStore.error('Invalid media type');
+    // Validate input based on current form state
+    if (currentMediaType === 'url') {
+      const url = urlInput.trim();
+      if (!url || url === 'http://' || url === 'https://') {
+        modalToastStore.error('Please enter a valid URL');
         return;
       }
-      
-      // Get current description
-      const description = (formRef.querySelector('#description') as HTMLTextAreaElement)?.value || '';
-      
-      // Update the report
-      const result = await reportService.updateReportWithTypeAndContent(
-        editingItem.reportId,
-        type,
-        content,
-        description
-      );
-      
-      if (result.status) {
-        modalToastStore.success('Report updated successfully!');
-        
-        // Update the media item in the list
-        const updatedItem = {
-          ...editingItem,
-          ...(type === 'link' ? { url: content as string } : {}),
-          ...(type === 'text' ? { text: content as string } : {}),
-          ...(type === 'audio' || type === 'video' ? { originalName: (content as File).name } : {})
-        };
-        
-        mediaItems = mediaItems.map(item => 
-          item.id === editingItem.id ? updatedItem : item
-        );
-        
-        // Close edit modal
-        cancelEditItem();
-      } else {
-        modalToastStore.error(result.message || 'Failed to update report');
+    } else if (currentMediaType === 'notes') {
+      const text = textInput.trim();
+      if (!text) {
+        modalToastStore.error('Please enter notes content');
+        return;
       }
-    } catch (error) {
-      console.error('Error updating report:', error);
-      modalToastStore.error('An error occurred while updating the report');
-    } finally {
-      isFormDisabled = false;
+    } else if ((currentMediaType === 'audio' || currentMediaType === 'video') && !selectedFile) {
+      modalToastStore.error(`Please select a ${currentMediaType} file`);
+      return;
     }
+    
+    // Create updated item with new type and content
+    const updatedItem: MediaItem = {
+      ...editingItem,
+      type: currentMediaType || editingItem.type, // Allow type change
+      createdAt: new Date(),
+      isExisting: true,
+      hasChanges: true // Mark as modified for batch update
+    };
+    
+    // Set content based on new type
+    if (currentMediaType === 'notes') {
+      updatedItem.text = textInput.trim();
+      updatedItem.url = undefined;
+      updatedItem.file = undefined;
+    } else if (currentMediaType === 'url') {
+      updatedItem.url = urlInput.trim();
+      updatedItem.text = undefined;
+      updatedItem.file = undefined;
+    } else if (currentMediaType === 'audio' || currentMediaType === 'video') {
+      updatedItem.file = selectedFile || undefined;
+      updatedItem.originalName = selectedFile?.name;
+      updatedItem.text = undefined;
+      updatedItem.url = undefined;
+    }
+    
+    // Replace the item in mediaItems array
+    const itemIndex = mediaItems.findIndex(item => item.id === editingItem.id);
+    if (itemIndex !== -1) {
+      mediaItems[itemIndex] = updatedItem;
+      mediaItems = [...mediaItems]; // Trigger reactivity
+    }
+    
+    modalToastStore.success('Changes saved! Click "Update Report" to apply changes.');
+    
+    // Close modal and reset
+    showEditModal = false;
+    editingItem = null;
+    currentMediaType = null;
+    selectedFile = null;
+    urlInput = 'http://';
+    textInput = '';
   }
   
   function cancelEditItem() {
@@ -1429,7 +1444,23 @@
               </div>
 
               <div class="space-y-4">
-                {#if editingItem.type === 'url'}
+                <!-- Media Type Selector -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Media Type *
+                  </label>
+                  <select
+                    bind:value={currentMediaType}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="notes">Notes/Text</option>
+                    <option value="url">URL Link</option>
+                    <option value="audio">Audio File</option>
+                    <option value="video">Video File</option>
+                  </select>
+                </div>
+
+                {#if currentMediaType === 'url'}
                   <!-- Edit URL -->
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1442,7 +1473,7 @@
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
-                {:else if editingItem.type === 'notes'}
+                {:else if currentMediaType === 'notes'}
                   <!-- Edit Notes -->
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1455,11 +1486,11 @@
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                     ></textarea>
                   </div>
-                {:else if editingItem.type === 'audio' || editingItem.type === 'video'}
+                {:else if currentMediaType === 'audio' || currentMediaType === 'video'}
                   <!-- Edit File -->
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                      Replace {editingItem.type === 'audio' ? 'Audio' : 'Video'} File *
+                      Replace {currentMediaType === 'audio' ? 'Audio' : 'Video'} File *
                     </label>
                     <div class="mb-3 p-3 bg-gray-50 rounded-md">
                       <div class="text-sm text-gray-600">
@@ -1469,8 +1500,8 @@
                     <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
                       <input
                         type="file"
-                        accept={editingItem.type === 'audio' ? '.mp3,.m4a,.wav,.aac' : '.mp4,.avi,.mov,.wmv,.mkv'}
-                        onchange={handleFileSelect}
+                        accept={currentMediaType === 'audio' ? '.mp3,.m4a,.wav,.aac' : '.mp4,.avi,.mov,.wmv,.mkv'}
+                        onchange={handleEditFileSelect}
                         class="hidden"
                         id="editFileInput"
                       />
