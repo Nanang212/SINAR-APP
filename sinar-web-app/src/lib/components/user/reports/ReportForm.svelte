@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { documentService, reportService, type Document, type Report, type CreateReportRequest, type UpdateReportRequest } from '$lib/services';
+  import { documentService, reportService, type Document, type Report, type ReportItem, type CreateReportRequest, type UpdateReportRequest } from '$lib/services';
   import Loading from '$lib/components/ui/loading.svelte';
   import { toastStore } from '$lib/stores/toast';
   import { modalToastStore } from '$lib/stores/modal-toast';
@@ -8,7 +8,7 @@
   interface $$Props {
     onSubmit?: (data: FormData) => void;
     onReset?: () => void;
-    reportData?: Report | null;
+    reportData?: Report | ReportItem | any | null; // Allow both Report and ReportItem type and complex structure
   }
 
   let { onSubmit, onReset, reportData }: $$Props = $props();
@@ -40,6 +40,13 @@
     url?: string;
     text?: string; // for notes content
     createdAt: Date;
+    // For existing reports from server
+    reportId?: number; // ID of existing report for editing
+    originalName?: string; // Original filename for files
+    content?: string; // Server content path or text
+    isExisting?: boolean; // Flag to indicate this is an existing report
+    downloadUrl?: string;
+    previewUrl?: string;
   }
   
   let mediaItems = $state<MediaItem[]>([]);
@@ -66,6 +73,11 @@
   
   // Check if we're in edit mode
   const isEditMode = $derived(!!reportData);
+  
+  // Edit mode states
+  let editModeData = $state<any>(null); // Full report data structure
+  let editingItem = $state<MediaItem | null>(null); // Currently editing item
+  let showEditModal = $state(false); // Show edit modal for individual items
 
   // Load documents on mount
   onMount(async () => {
@@ -74,14 +86,22 @@
 
   // Load report data into form when provided
   $effect(() => {
-    if (reportData && formRef) {
-      populateForm(reportData);
+    if (reportData && formRef && !documentsLoading) {
+      // Check if it's the complex structure or single report structure
+      if ((reportData as any).document && (reportData as any).reports) {
+        // Complex structure from browse table
+        populateFormFromReportData(reportData);
+      } else if ((reportData as any).id && (reportData as any).type) {
+        // Single ReportItem structure from row click
+        populateForm(reportData);
+      } else {
+        // Legacy Report structure
+        populateForm(reportData);
+      }
     }
   });
 
   async function loadDocuments(page = 1, search = '', append = false) {
-    console.log(`🚀 Loading documents - Page: ${page}, Search: "${search}", Append: ${append}`);
-    
     if (page === 1) {
       documentsLoading = true;
     } else {
@@ -178,16 +198,137 @@
     }, 500);
   }
 
-  function populateForm(report: Report) {
+  async function populateForm(report: any) {
     const form = formRef;
     if (!form) return;
 
-    // Populate basic fields
+    // Handle document_id from either Report or ReportItem structure
     selectedDocumentId = report.document_id?.toString() || '';
+    
+    // Fetch document by ID if not in documents array
+    if (selectedDocumentId) {
+      const existingDoc = documents.find(doc => doc.id.toString() === selectedDocumentId);
+      
+      if (!existingDoc) {
+        try {
+          const docResult = await documentService.getDocumentById(selectedDocumentId);
+          if (docResult.status && docResult.data) {
+            documents = [docResult.data, ...documents];
+          }
+        } catch (error) {
+          console.error('Failed to fetch document:', error);
+        }
+      }
+    }
+    
+    // Fallback: use single report data (this should rarely be used now)
     (form.querySelector('#description') as HTMLTextAreaElement).value = report.description || '';
     
-    // Note: For edit mode, we'll show existing files as read-only
-    // The user can only add new files, not edit existing ones
+    // Convert single report to MediaItem format  
+    const mediaItem: MediaItem = {
+      id: report.id.toString(),
+      reportId: report.id,
+      type: report.type === 'TEXT' ? 'notes' : 
+            report.type === 'LINK' ? 'url' :
+            report.type === 'AUDIO' ? 'audio' : 'video',
+      createdAt: new Date(report.created_at || Date.now()),
+      isExisting: true,
+      content: report.content || '',
+      originalName: report.original_name || null,
+      downloadUrl: report.download_url || null,
+      previewUrl: report.preview_url || null
+    };
+    
+    // Set appropriate content based on type
+    if (report.type === 'TEXT') {
+      mediaItem.text = report.content;
+    } else if (report.type === 'LINK') {
+      mediaItem.url = report.content;
+    }
+    
+    mediaItems = [mediaItem];
+  }
+  
+  // New function to populate form from complex report data structure
+  function populateFormFromReportData(reportData: any) {
+    if (!reportData || !formRef) return;
+    
+    editModeData = reportData;
+    
+    // Set document info and add it to documents array if not already there
+    if (reportData.document) {
+      selectedDocumentId = reportData.document.id.toString();
+      
+      // Check if this document is already in the documents array
+      const existingDoc = documents.find(doc => doc.id.toString() === selectedDocumentId);
+      if (!existingDoc) {
+        // Add the document from reportData to the documents array
+        const documentFromReport: Document = {
+          id: reportData.document.id,
+          title: reportData.document.original_name || 'Document Title',
+          filename: reportData.document.url ? reportData.document.url.split('/').pop() || '' : '',
+          original_name: reportData.document.original_name || '',
+          url: reportData.document.url || '',
+          remark: null,
+          uploaded_at: new Date().toISOString(),
+          username_upload: 'System',
+          categories: [],
+          is_downloaded: false,
+          createdBy: 'System',
+          updatedBy: 'System'
+        };
+        documents = [documentFromReport, ...documents];
+      }
+    }
+    
+    // Process all report types and find the most recent description
+    let latestDescription = '';
+    let latestUpdateTime: Date | null = null;
+    const allMediaItems: MediaItem[] = [];
+    
+    // Process each report type
+    ['TEXT', 'LINK', 'AUDIO', 'VIDEO'].forEach(type => {
+      const reports = reportData.reports[type] || [];
+      
+      reports.forEach((reportItem: any) => {
+        // Track latest description
+        if (reportItem.updated_at && reportItem.description) {
+          const updateTime = new Date(reportItem.updated_at);
+          if (!latestUpdateTime || updateTime > latestUpdateTime) {
+            latestUpdateTime = updateTime;
+            latestDescription = reportItem.description;
+          }
+        }
+        
+        // Convert to MediaItem format
+        const mediaItem: MediaItem = {
+          id: reportItem.id.toString(),
+          reportId: reportItem.id,
+          type: type.toLowerCase() === 'text' ? 'notes' : 
+                type.toLowerCase() === 'link' ? 'url' : 
+                type.toLowerCase() as 'audio' | 'video',
+          createdAt: new Date(reportItem.created_at),
+          isExisting: true,
+          content: reportItem.content,
+          originalName: reportItem.original_name,
+          downloadUrl: reportItem.download_url,
+          previewUrl: reportItem.preview_url
+        };
+        
+        // Set appropriate content based on type
+        if (type === 'TEXT') {
+          mediaItem.text = reportItem.content;
+        } else if (type === 'LINK') {
+          mediaItem.url = reportItem.content;
+        }
+        
+        allMediaItems.push(mediaItem);
+      });
+    });
+    
+    // Set form values
+    mediaItems = allMediaItems;
+    (formRef.querySelector('#description') as HTMLTextAreaElement).value = latestDescription;
   }
 
   function handleDocumentChange(documentId: string) {
@@ -548,6 +689,140 @@
     textInput = '';
     tempUrlList = [];
   }
+  
+  // Edit mode functions
+  function startEditItem(item: MediaItem) {
+    if (!item.isExisting || !item.reportId) return;
+    
+    editingItem = { ...item };
+    
+    // Set up editing form values based on item type
+    if (item.type === 'url') {
+      urlInput = item.url || 'http://';
+      tempUrlList = [];
+    } else if (item.type === 'notes') {
+      textInput = item.text || '';
+    }
+    
+    currentMediaType = item.type;
+    showEditModal = true;
+  }
+  
+  async function saveEditedItem() {
+    if (!editingItem?.reportId) return;
+    
+    try {
+      isFormDisabled = true;
+      
+      let content: string | File;
+      let type: 'audio' | 'video' | 'link' | 'text';
+      
+      // Prepare content and type based on editing item type
+      if (editingItem.type === 'url') {
+        type = 'link';
+        content = urlInput.trim();
+        if (!content || content === 'http://' || content === 'https://') {
+          modalToastStore.error('Please enter a valid URL');
+          return;
+        }
+      } else if (editingItem.type === 'notes') {
+        type = 'text';
+        content = textInput.trim();
+        if (!content) {
+          modalToastStore.error('Please enter notes content');
+          return;
+        }
+      } else if (editingItem.type === 'audio' || editingItem.type === 'video') {
+        type = editingItem.type;
+        if (!selectedFile) {
+          modalToastStore.error(`Please select a ${editingItem.type} file`);
+          return;
+        }
+        content = selectedFile;
+      } else {
+        modalToastStore.error('Invalid media type');
+        return;
+      }
+      
+      // Get current description
+      const description = (formRef.querySelector('#description') as HTMLTextAreaElement)?.value || '';
+      
+      // Update the report
+      const result = await reportService.updateReportWithTypeAndContent(
+        editingItem.reportId,
+        type,
+        content,
+        description
+      );
+      
+      if (result.status) {
+        modalToastStore.success('Report updated successfully!');
+        
+        // Update the media item in the list
+        const updatedItem = {
+          ...editingItem,
+          ...(type === 'link' ? { url: content as string } : {}),
+          ...(type === 'text' ? { text: content as string } : {}),
+          ...(type === 'audio' || type === 'video' ? { originalName: (content as File).name } : {})
+        };
+        
+        mediaItems = mediaItems.map(item => 
+          item.id === editingItem.id ? updatedItem : item
+        );
+        
+        // Close edit modal
+        cancelEditItem();
+      } else {
+        modalToastStore.error(result.message || 'Failed to update report');
+      }
+    } catch (error) {
+      console.error('Error updating report:', error);
+      modalToastStore.error('An error occurred while updating the report');
+    } finally {
+      isFormDisabled = false;
+    }
+  }
+  
+  function cancelEditItem() {
+    showEditModal = false;
+    editingItem = null;
+    currentMediaType = null;
+    selectedFile = null;
+    urlInput = 'http://';
+    textInput = '';
+  }
+
+  async function deleteExistingItem(item: MediaItem) {
+    if (!item.isExisting || !item.reportId) return;
+    
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to delete this ${item.type} item permanently? This action cannot be undone.`);
+    if (!confirmed) return;
+    
+    try {
+      isFormDisabled = true;
+      
+      // Call delete API
+      const result = await reportService.deleteReport(item.reportId);
+      
+      if (result.status) {
+        modalToastStore.success('Report item deleted successfully!');
+        
+        // Remove the item from mediaItems array
+        mediaItems = mediaItems.filter(mediaItem => mediaItem.id !== item.id);
+        
+        // Refresh report data if needed
+        await refreshReportData();
+      } else {
+        modalToastStore.error(result.message || 'Failed to delete report item');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      modalToastStore.error('An error occurred while deleting the item');
+    } finally {
+      isFormDisabled = false;
+    }
+  }
 
   function toggleDocumentDropdown() {
     isDocumentDropdownOpen = !isDocumentDropdownOpen;
@@ -651,8 +926,8 @@
             type="button"
             id="document-dropdown-button"
             class="w-full px-4 py-3 text-base text-left border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between {selectedDocumentId === '' ? 'text-red-500 border-red-300' : 'text-gray-900'} disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed min-h-[48px]"
-            disabled={isFormDisabled}
-            onclick={!isFormDisabled ? toggleDocumentDropdown : undefined}
+            disabled={isFormDisabled || isEditMode}
+            onclick={!isFormDisabled && !isEditMode ? toggleDocumentDropdown : undefined}
           >
             <div class="flex-1 min-w-0">
               {#if selectedDocumentId === ''}
@@ -856,19 +1131,20 @@
           Media & Content
         </label>
         
-        <div class="relative">
-          <!-- Add Media Button -->
-          <button
-            type="button"
-            onclick={toggleAddMediaDropdown}
-            disabled={isFormDisabled}
-            class="w-full px-4 py-3 text-base border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-          >
-            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            <span class="text-gray-600 font-medium">Add Media</span>
-          </button>
+        {#if !isEditMode}
+          <div class="relative">
+            <!-- Add Media Button -->
+            <button
+              type="button"
+              onclick={toggleAddMediaDropdown}
+              disabled={isFormDisabled}
+              class="w-full px-4 py-3 text-base border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span class="text-gray-600 font-medium">Add Media</span>
+            </button>
 
           <!-- Add Media Dropdown -->
           {#if showAddMediaDropdown}
@@ -934,7 +1210,7 @@
           {/if}
         </div>
 
-        <!-- Media Form Modal -->
+          <!-- Media Form Modal -->
         {#if showMediaForm && currentMediaType}
           <div class="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
             <div class="flex items-center justify-between mb-4">
@@ -1117,6 +1393,145 @@
             </div>
           </div>
         {/if}
+        {:else}
+          <!-- Edit Mode Message -->
+          <div class="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+            <div class="flex items-center space-x-3">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <div>
+                <div class="text-sm font-medium text-blue-900">Edit Mode</div>
+                <div class="text-xs text-blue-700">You can edit individual media items in the table below. Click the edit button next to any item to modify it.</div>
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Edit Modal for Individual Items -->
+        {#if showEditModal && editingItem}
+          <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">
+                  Edit {editingItem.type === 'url' ? 'URL Link' : editingItem.type === 'notes' ? 'Notes' : editingItem.type.charAt(0).toUpperCase() + editingItem.type.slice(1)} 
+                </h3>
+                <button
+                  type="button"
+                  onclick={cancelEditItem}
+                  class="text-gray-400 hover:text-gray-600"
+                  aria-label="Close edit modal"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div class="space-y-4">
+                {#if editingItem.type === 'url'}
+                  <!-- Edit URL -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      URL *
+                    </label>
+                    <input
+                      type="url"
+                      bind:value={urlInput}
+                      placeholder="https://example.com"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                {:else if editingItem.type === 'notes'}
+                  <!-- Edit Notes -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Notes Content *
+                    </label>
+                    <textarea
+                      bind:value={textInput}
+                      rows="4"
+                      placeholder="Enter your notes, observations, or text content..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    ></textarea>
+                  </div>
+                {:else if editingItem.type === 'audio' || editingItem.type === 'video'}
+                  <!-- Edit File -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Replace {editingItem.type === 'audio' ? 'Audio' : 'Video'} File *
+                    </label>
+                    <div class="mb-3 p-3 bg-gray-50 rounded-md">
+                      <div class="text-sm text-gray-600">
+                        <strong>Current file:</strong> {editingItem.originalName || 'Unknown'}
+                      </div>
+                    </div>
+                    <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
+                      <input
+                        type="file"
+                        accept={editingItem.type === 'audio' ? '.mp3,.m4a,.wav,.aac' : '.mp4,.avi,.mov,.wmv,.mkv'}
+                        onchange={handleFileSelect}
+                        class="hidden"
+                        id="editFileInput"
+                      />
+                      <label for="editFileInput" class="cursor-pointer">
+                        {#if selectedFile}
+                          <div class="flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-sm text-gray-900">{selectedFile.name}</span>
+                            <span class="text-xs text-gray-500">({Math.round(selectedFile.size / 1024 / 1024 * 100) / 100} MB)</span>
+                          </div>
+                        {:else}
+                          <div>
+                            <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-600">
+                              Click to select new {editingItem.type} file
+                            </p>
+                            <p class="text-xs text-gray-500">
+                              {editingItem.type === 'audio' ? 'MP3, M4A, WAV, AAC' : 'MP4, AVI, MOV, WMV, MKV'}
+                            </p>
+                          </div>
+                        {/if}
+                      </label>
+                    </div>
+                  </div>
+                {/if}
+
+                <!-- Modal Actions -->
+                <div class="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onclick={cancelEditItem}
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onclick={saveEditedItem}
+                    disabled={isFormDisabled}
+                    class="px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed rounded-md transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                  >
+                    {#if isFormDisabled}
+                      <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>Updating...</span>
+                      </div>
+                    {:else}
+                      Update {editingItem.type === 'url' ? 'Link' : editingItem.type === 'notes' ? 'Notes' : editingItem.type.charAt(0).toUpperCase() + editingItem.type.slice(1)}
+                    {/if}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        {/if}
 
         <!-- Media Items Table -->
         {#if mediaItems.length > 0}
@@ -1162,18 +1577,36 @@
                       <td class="px-4 py-3">
                         <div class="text-sm text-gray-900">
                           {#if item.file}
+                            <!-- New uploaded file -->
                             <div class="flex items-center space-x-2">
                               <span class="truncate max-w-[200px]" title={item.file.name}>{item.file.name}</span>
                               <span class="text-xs text-gray-500">({Math.round(item.file.size / 1024 / 1024 * 100) / 100} MB)</span>
                             </div>
+                          {:else if item.originalName && (item.type === 'audio' || item.type === 'video')}
+                            <!-- Existing audio/video file from server -->
+                            <div class="flex items-center space-x-2">
+                              <span class="truncate max-w-[200px]" title={item.originalName}>{item.originalName}</span>
+                              {#if item.isExisting}
+                                <span class="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">Existing</span>
+                              {/if}
+                            </div>
                           {:else if item.url}
+                            <!-- URL link -->
                             <a href={item.url} target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline truncate max-w-[200px] block" title={item.url}>
                               {item.url.length > 40 ? item.url.substring(0, 40) + '...' : item.url}
                             </a>
                           {:else if item.text}
+                            <!-- Notes/text content -->
                             <div class="text-sm text-gray-900">
                               <span class="truncate max-w-[200px] block" title={item.text}>
                                 {item.text.length > 50 ? item.text.substring(0, 50) + '...' : item.text}
+                              </span>
+                            </div>
+                          {:else if item.content}
+                            <!-- Fallback: show content field -->
+                            <div class="text-sm text-gray-600">
+                              <span class="truncate max-w-[200px] block" title={item.content}>
+                                {item.content.includes('/') ? item.content.split('/').pop() : item.content}
                               </span>
                             </div>
                           {/if}
@@ -1181,18 +1614,47 @@
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap">
                         <div class="flex items-center space-x-2">
-                          <button
-                            type="button"
-                            onclick={() => removeMediaItem(item.id)}
-                            disabled={isFormDisabled}
-                            class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
-                            title="Remove item"
-                            aria-label="Remove media item"
-                          >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {#if item.isExisting && isEditMode}
+                            <!-- Edit and Delete buttons for existing items in edit mode -->
+                            <button
+                              type="button"
+                              onclick={() => startEditItem(item)}
+                              disabled={isFormDisabled}
+                              class="text-blue-600 hover:text-blue-800 p-1 rounded disabled:opacity-50"
+                              title="Edit this item"
+                              aria-label="Edit media item"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onclick={() => deleteExistingItem(item)}
+                              disabled={isFormDisabled}
+                              class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                              title="Delete this item permanently"
+                              aria-label="Delete media item"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          {:else}
+                            <!-- Remove button for new items or in create mode -->
+                            <button
+                              type="button"
+                              onclick={() => removeMediaItem(item.id)}
+                              disabled={isFormDisabled}
+                              class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                              title="Remove item"
+                              aria-label="Remove media item"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          {/if}
                         </div>
                       </td>
                     </tr>
@@ -1210,7 +1672,7 @@
               Ready to upload {mediaItems.length} media item(s)
             </div>
           </div>
-        {:else if selectedDocumentId !== ''}
+        {:else if selectedDocumentId !== '' && !isEditMode}
           <div class="mt-4 text-sm text-amber-600 flex items-center space-x-1">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />

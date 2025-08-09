@@ -631,25 +631,23 @@ class ReportService {
     try {
       const formData = new FormData();
       
-      // Add required parameters
-      formData.append('type', type);
-      
+      // Add description if provided
       if (description) {
         formData.append('description', description);
       }
       
-      // Handle content based on type
+      // Handle content based on type - use type as the form key
       if (type === 'audio' || type === 'video') {
         // For audio/video, content should be a File
         if (content instanceof File) {
-          formData.append('content', content);
+          formData.append(type, content); // Use 'audio' or 'video' as key
         } else {
           throw new Error(`Content must be a File for ${type} type`);
         }
       } else if (type === 'link' || type === 'text') {
         // For link/text, content should be a string
         if (typeof content === 'string') {
-          formData.append('content', content);
+          formData.append(type, content); // Use 'link' or 'text' as key
         } else {
           throw new Error(`Content must be a string for ${type} type`);
         }

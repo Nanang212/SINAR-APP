@@ -254,44 +254,9 @@
     const apiDocument = apiDocuments.find(apiDoc => apiDoc.document.id.toString() === document.id);
     
     if (apiDocument && onRowClick) {
-      // Get the latest report from all types based on updated_at/created_at
-      let latestReport = null;
-      
-      ['TEXT', 'LINK', 'AUDIO', 'VIDEO'].forEach(type => {
-        if (apiDocument.reports[type] && apiDocument.reports[type].length > 0) {
-          const latestInType = apiDocument.reports[type].reduce((latest: any, current: any) => 
-            new Date(current.updated_at || current.created_at) > new Date(latest.updated_at || latest.created_at) ? current : latest
-          );
-          if (!latestReport || new Date(latestInType.updated_at || latestInType.created_at) > new Date(latestReport.updated_at || latestReport.created_at)) {
-            latestReport = latestInType;
-          }
-        }
-      });
-
-      if (latestReport) {
-        // Prepare the report data for form pre-filling with all reports
-        const formReportData = {
-          id: latestReport.id,
-          document_id: apiDocument.document.id,
-          description: latestReport.description || '',
-          type: latestReport.type,
-          content: latestReport.content,
-          original_name: latestReport.original_name,
-          created_at: latestReport.created_at,
-          updated_at: latestReport.updated_at,
-          // Include document info for context
-          document: {
-            id: apiDocument.document.id,
-            title: apiDocument.document.original_name,
-            original_name: apiDocument.document.original_name,
-            is_downloaded: apiDocument.document.is_downloaded || false
-          },
-          // Include all reports for this document
-          allReports: apiDocument.reports
-        };
-        
-        onRowClick(formReportData);
-      }
+      // Pass the complete apiDocument structure directly
+      // This matches the format expected by ReportForm's populateFormFromReportData
+      onRowClick(apiDocument);
     }
   }
 
