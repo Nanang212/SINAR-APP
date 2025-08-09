@@ -399,39 +399,6 @@
 
 
 <div class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-8 sm:pt-12">
-  <!-- Error State -->
-  {#if error}
-    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-      <div class="flex">
-        <svg
-          class="w-5 h-5 text-red-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-red-800">
-            Error loading documents
-          </h3>
-          <p class="mt-1 text-sm text-red-700">{error}</p>
-          <button
-            onclick={handleRefresh}
-            class="mt-2 text-sm font-medium text-red-800 hover:text-red-900 underline"
-          >
-            Try again
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
-
   <!-- Loading State -->
   {#if isLoading}
     <div class="flex justify-center items-center py-12">
@@ -487,8 +454,20 @@
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          {#each paginatedData() as doc (doc.id)}
-            <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-200" onclick={() => handleRowClick(doc)}>
+          {#if paginatedData().length === 0 && !isLoading}
+            <!-- Empty State Row -->
+            <tr>
+              <td colspan="5" class="px-6 py-16 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No documents found</h3>
+                <p class="mt-1 text-sm text-gray-500">No documents available on this page.</p>
+              </td>
+            </tr>
+          {:else}
+            {#each paginatedData() as doc (doc.id)}
+              <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-200" onclick={() => handleRowClick(doc)}>
               <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
                 <div class="flex items-center">
                   <svg
@@ -571,36 +550,12 @@
                 </div>
               </td>
             </tr>
-          {/each}
+            {/each}
+          {/if}
         </tbody>
       </table>
       </div>
     </div>
-
-    <!-- Empty State -->
-    {#if paginatedData().length === 0 && !isLoading}
-      <div class="text-center py-12">
-        <svg
-          class="mx-auto h-12 w-12 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900">
-          No documents found
-        </h3>
-        <p class="mt-1 text-sm text-gray-500">
-          No documents available on this page.
-        </p>
-      </div>
-    {/if}
 
     <!-- Pagination -->
     <div class="flex-shrink-0 flex flex-col sm:flex-row items-center justify-between mt-4 sm:mt-6 pt-4 border-t border-gray-200 bg-white gap-4 sm:gap-0">
