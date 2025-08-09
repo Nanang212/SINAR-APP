@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { documentService, reportService, type Document, type Report, type ReportItem, type CreateReportRequest, type UpdateReportRequest } from '$lib/services';
   import Loading from '$lib/components/ui/loading.svelte';
+  import ConfirmationModal from '$lib/components/ui/ConfirmationModal.svelte';
   import { toastStore } from '$lib/stores/toast';
   import { modalToastStore } from '$lib/stores/modal-toast';
 
@@ -21,6 +22,7 @@
   let isDocumentDropdownOpen = $state(false);
   let isSubmitting = $state(false);
   let isFormDisabled = $state(false);
+  let isUpdateCompleted = $state(false); // Track if update was successful and form should be disabled
   
   // Infinite scrolling state
   let currentPage = $state(1);
@@ -48,6 +50,7 @@
     downloadUrl?: string;
     previewUrl?: string;
     hasChanges?: boolean; // Flag to indicate this item has been modified
+    markedForDeletion?: boolean; // Flag to indicate this item is marked for deletion
   }
   
   let mediaItems = $state<MediaItem[]>([]);
@@ -75,10 +78,18 @@
   // Check if we're in edit mode
   const isEditMode = $derived(!!reportData);
   
+  // Check if form should be completely disabled (after successful update or during submission)
+  const shouldDisableForm = $derived(isFormDisabled || isUpdateCompleted);
+  
   // Edit mode states
   let editModeData = $state<any>(null); // Full report data structure
   let editingItem = $state<MediaItem | null>(null); // Currently editing item
   let showEditModal = $state(false); // Show edit modal for individual items
+  let deletedItems = $state<MediaItem[]>([]); // Items marked for deletion (batch delete)
+  
+  // Confirmation modal states
+  let showCancelOperationModal = $state(false);
+  let itemToCancel = $state<MediaItem | null>(null);
 
   // Load documents on mount
   onMount(async () => {
@@ -88,6 +99,9 @@
   // Load report data into form when provided
   $effect(() => {
     if (reportData && formRef && !documentsLoading) {
+      // Reset update completed state when new data is loaded
+      isUpdateCompleted = false;
+      
       // Check if it's the complex structure or single report structure
       if ((reportData as any).document && (reportData as any).reports) {
         // Complex structure from browse table
@@ -361,11 +375,8 @@
 
     try {
       if (isEditMode && reportData) {
-        // For edit mode, we'll handle it differently
-        // For now, let's focus on create mode
-        modalToastStore.error('Edit mode for multiple files not implemented yet');
-        isFormDisabled = false;
-        return;
+        // Handle edit mode with batch updates for changed items only
+        await handleBatchUpdate(description);
       } else {
         // Create new reports with sequential API calls
         await handleMultipleContentUpload(selectedDocumentId, description);
@@ -469,12 +480,188 @@
     // Don't show additional error messages as they were already shown immediately
   }
 
+  async function handleBatchUpdate(description: string) {
+    // Filter items that have changes
+    const changedItems = mediaItems.filter(item => item.hasChanges === true);
+    
+    if (changedItems.length === 0 && deletedItems.length === 0) {
+      modalToastStore.success('No changes to save');
+      return;
+    }
+
+    // Calculate total operations (updates + deletes)
+    const totalOperations = changedItems.length + deletedItems.length;
+    uploadProgress.total = totalOperations;
+    uploadProgress.current = 0;
+
+    let successCount = 0;
+    let failedItems: string[] = [];
+
+    // Sequential update of changed media items only
+    for (let i = 0; i < changedItems.length; i++) {
+      const item = changedItems[i];
+      uploadProgress.current = i + 1;
+      
+      const displayName = item.file ? item.file.name : 
+                         item.url ? item.url.substring(0, 30) + '...' : 
+                         item.text ? `Notes: ${item.text.substring(0, 30)}...` :
+                         `${item.type} item`;
+      uploadProgress.currentFile = displayName;
+
+      if (!item.reportId) {
+        console.error('Missing reportId for item:', item);
+        failedItems.push(displayName);
+        continue;
+      }
+
+      try {
+        let content: string | File;
+        let serviceType: 'audio' | 'video' | 'link' | 'text';
+        
+        // Prepare content and type for the service call
+        if (item.type === 'audio' || item.type === 'video') {
+          if (!item.file) {
+            failedItems.push(displayName);
+            modalToastStore.error(`No file provided for ${item.type} item`);
+            continue;
+          }
+          content = item.file;
+          serviceType = item.type;
+        } else if (item.type === 'url') {
+          if (!item.url) {
+            failedItems.push(displayName);
+            modalToastStore.error('No URL provided for URL item');
+            continue;
+          }
+          content = item.url;
+          serviceType = 'link';
+        } else if (item.type === 'notes') {
+          if (!item.text) {
+            failedItems.push(displayName);
+            modalToastStore.error('No text provided for notes item');
+            continue;
+          }
+          content = item.text;
+          serviceType = 'text';
+        } else {
+          failedItems.push(displayName);
+          modalToastStore.error(`Unknown item type: ${item.type}`);
+          continue;
+        }
+
+        console.log(`Updating ${item.type} ${i + 1}/${changedItems.length}: ${displayName} (ID: ${item.reportId})`);
+        
+        const result = await reportService.updateReportWithTypeAndContent(
+          item.reportId,
+          serviceType,
+          content,
+          description
+        );
+        
+        if (result.status) {
+          successCount++;
+          console.log(`✅ Successfully updated: ${displayName}`);
+          
+          // Remove hasChanges flag since it's now saved
+          const itemIndex = mediaItems.findIndex(mediaItem => mediaItem.id === item.id);
+          if (itemIndex !== -1) {
+            mediaItems[itemIndex].hasChanges = false;
+          }
+        } else {
+          failedItems.push(displayName);
+          console.error(`❌ Failed to update: ${displayName} - ${result.message}`);
+          modalToastStore.error(result.message || 'Failed to update report');
+          break;
+        }
+
+        // Small delay between updates
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+      } catch (error) {
+        failedItems.push(displayName);
+        console.error(`❌ Error updating ${displayName}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        modalToastStore.error(errorMessage);
+        break;
+      }
+    }
+
+    // Process deletions
+    let deletedCount = 0;
+    for (let i = 0; i < deletedItems.length; i++) {
+      const item = deletedItems[i];
+      uploadProgress.current = changedItems.length + i + 1;
+      
+      const displayName = item.originalName || item.url || item.text || `${item.type} item`;
+      uploadProgress.currentFile = `Deleting: ${displayName}`;
+
+      if (!item.reportId) {
+        console.error('Missing reportId for deletion:', item);
+        failedItems.push(displayName);
+        continue;
+      }
+
+      try {
+        console.log(`Deleting ${item.type} ${i + 1}/${deletedItems.length}: ${displayName} (ID: ${item.reportId})`);
+        
+        const result = await reportService.deleteReport(item.reportId);
+        
+        if (result.status) {
+          deletedCount++;
+          console.log(`✅ Successfully deleted: ${displayName}`);
+        } else {
+          failedItems.push(displayName);
+          console.error(`❌ Failed to delete: ${displayName} - ${result.message}`);
+          modalToastStore.error(result.message || 'Failed to delete report');
+          break;
+        }
+
+        // Small delay between deletions
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+      } catch (error) {
+        failedItems.push(displayName);
+        console.error(`❌ Error deleting ${displayName}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        modalToastStore.error(errorMessage);
+        break;
+      }
+    }
+
+    // Clear deleted items if all successful
+    if (deletedCount === deletedItems.length) {
+      deletedItems = [];
+    }
+
+    // Show final results
+    const totalSuccessful = successCount + deletedCount;
+    
+    if (totalSuccessful > 0 && failedItems.length === 0) {
+      let message = '';
+      if (successCount > 0 && deletedCount > 0) {
+        message = `Successfully updated ${successCount} item(s) and deleted ${deletedCount} item(s)!`;
+      } else if (successCount > 0) {
+        message = `Successfully updated ${successCount} item(s)!`;
+      } else if (deletedCount > 0) {
+        message = `Successfully deleted ${deletedCount} item(s)!`;
+      }
+      modalToastStore.success(message + ' Form is now disabled. Click "Reset" to make new changes or select new data from browse.');
+      
+      // Disable form after successful update
+      isUpdateCompleted = true;
+    } else if (totalSuccessful > 0 && failedItems.length > 0) {
+      modalToastStore.warning(`Completed ${totalSuccessful} operation(s), ${failedItems.length} failed`);
+    }
+  }
+
   function handleReset() {
     selectedDocumentId = '';
     mediaItems = [];
+    deletedItems = [];
     uploadProgress = { current: 0, total: 0, currentFile: '' };
     isDocumentDropdownOpen = false;
     isFormDisabled = false;
+    isUpdateCompleted = false; // Reset update completion state
     showAddMediaDropdown = false;
     showMediaForm = false;
     currentMediaType = null;
@@ -482,6 +669,8 @@
     urlInput = 'http://';
     textInput = '';
     tempUrlList = [];
+    showCancelOperationModal = false;
+    itemToCancel = null;
     formRef?.reset();
     onReset?.();
   }
@@ -537,7 +726,7 @@
       
       if (isValidType) {
         selectedFile = file;
-        modalToastStore.success(`File selected: ${file.name}`);
+        // No toast notification for file selection in edit mode
       } else {
         modalToastStore.error(`Invalid file type. Allowed: ${allowedExtensions.join(', ')}`);
         input.value = ''; // Clear invalid selection
@@ -807,36 +996,124 @@
     textInput = '';
   }
 
-  async function deleteExistingItem(item: MediaItem) {
+  // Helper function to find original item data from editModeData
+  function findOriginalItemData(reportId: number): MediaItem | null {
+    if (!editModeData || !editModeData.reports) return null;
+    
+    // Search through all report types in editModeData
+    const reportTypes = ['TEXT', 'LINK', 'AUDIO', 'VIDEO'];
+    
+    for (const type of reportTypes) {
+      const reports = editModeData.reports[type] || [];
+      const originalReport = reports.find((report: any) => report.id === reportId);
+      
+      if (originalReport) {
+        // Convert back to MediaItem format with original data
+        const originalItem: MediaItem = {
+          id: originalReport.id.toString(),
+          reportId: originalReport.id,
+          type: type.toLowerCase() === 'text' ? 'notes' : 
+                type.toLowerCase() === 'link' ? 'url' : 
+                type.toLowerCase() as 'audio' | 'video',
+          createdAt: new Date(originalReport.created_at),
+          isExisting: true,
+          content: originalReport.content,
+          originalName: originalReport.original_name,
+          downloadUrl: originalReport.download_url,
+          previewUrl: originalReport.preview_url,
+          hasChanges: false // Reset changes flag
+        };
+        
+        // Set appropriate content based on original type
+        if (type === 'TEXT') {
+          originalItem.text = originalReport.content;
+        } else if (type === 'LINK') {
+          originalItem.url = originalReport.content;
+        }
+        
+        return originalItem;
+      }
+    }
+    
+    return null;
+  }
+
+  // Cancel operation - revert item back to original state
+  function cancelOperation(item: MediaItem) {
+    if (!item.hasChanges || !item.reportId) return;
+    
+    itemToCancel = item;
+    showCancelOperationModal = true;
+  }
+
+  function handleCancelOperationConfirm() {
+    if (!itemToCancel) return;
+    
+    // Find original data
+    const originalItem = findOriginalItemData(itemToCancel.reportId!);
+    if (!originalItem) {
+      modalToastStore.error('Could not find original data to revert to');
+      showCancelOperationModal = false;
+      itemToCancel = null;
+      return;
+    }
+    
+    // Replace the modified item with original data
+    const itemIndex = mediaItems.findIndex(mediaItem => mediaItem.id === itemToCancel.id);
+    if (itemIndex !== -1) {
+      mediaItems[itemIndex] = originalItem;
+      mediaItems = [...mediaItems]; // Trigger reactivity
+    }
+    
+    modalToastStore.success(`Changes cancelled. Item reverted to original ${originalItem.type} state.`);
+    
+    // Close modal
+    showCancelOperationModal = false;
+    itemToCancel = null;
+  }
+
+  function handleCancelOperationCancel() {
+    showCancelOperationModal = false;
+    itemToCancel = null;
+  }
+
+  function deleteExistingItem(item: MediaItem) {
     if (!item.isExisting || !item.reportId) return;
     
-    // Show confirmation dialog
-    const confirmed = confirm(`Are you sure you want to delete this ${item.type} item permanently? This action cannot be undone.`);
-    if (!confirmed) return;
-    
-    try {
-      isFormDisabled = true;
-      
-      // Call delete API
-      const result = await reportService.deleteReport(item.reportId);
-      
-      if (result.status) {
-        modalToastStore.success('Report item deleted successfully!');
-        
-        // Remove the item from mediaItems array
-        mediaItems = mediaItems.filter(mediaItem => mediaItem.id !== item.id);
-        
-        // Refresh report data if needed
-        await refreshReportData();
-      } else {
-        modalToastStore.error(result.message || 'Failed to delete report item');
-      }
-    } catch (error) {
-      console.error('Delete error:', error);
-      modalToastStore.error('An error occurred while deleting the item');
-    } finally {
-      isFormDisabled = false;
+    // Mark item for deletion (no confirmation needed)
+    const itemIndex = mediaItems.findIndex(mediaItem => mediaItem.id === item.id);
+    if (itemIndex !== -1) {
+      mediaItems[itemIndex] = {
+        ...item,
+        markedForDeletion: true,
+        hasChanges: false // Clear any pending changes when marking for deletion
+      };
+      mediaItems = [...mediaItems]; // Trigger reactivity
     }
+    
+    // Add to deletedItems array for batch processing
+    deletedItems = [...deletedItems, item];
+    
+    modalToastStore.success(`${item.type} item marked for deletion. Click "Update Report" to apply changes.`);
+  }
+
+  function cancelDeletion(item: MediaItem) {
+    if (!item.markedForDeletion) return;
+    
+    // Remove marked for deletion flag
+    const itemIndex = mediaItems.findIndex(mediaItem => mediaItem.id === item.id);
+    if (itemIndex !== -1) {
+      mediaItems[itemIndex] = {
+        ...item,
+        markedForDeletion: false
+      };
+      mediaItems = [...mediaItems]; // Trigger reactivity
+    }
+    
+    // Remove from deletedItems array
+    deletedItems = deletedItems.filter(deletedItem => deletedItem.id !== item.id);
+    
+    modalToastStore.success(`${item.type} item deletion cancelled.`);
   }
 
   function toggleDocumentDropdown() {
@@ -941,8 +1218,8 @@
             type="button"
             id="document-dropdown-button"
             class="w-full px-4 py-3 text-base text-left border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between {selectedDocumentId === '' ? 'text-red-500 border-red-300' : 'text-gray-900'} disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed min-h-[48px]"
-            disabled={isFormDisabled || isEditMode}
-            onclick={!isFormDisabled && !isEditMode ? toggleDocumentDropdown : undefined}
+            disabled={shouldDisableForm || isEditMode}
+            onclick={!shouldDisableForm && !isEditMode ? toggleDocumentDropdown : undefined}
           >
             <div class="flex-1 min-w-0">
               {#if selectedDocumentId === ''}
@@ -990,7 +1267,7 @@
                     placeholder="Search documents..."
                     bind:value={searchQuery}
                     oninput={(e) => handleSearchChange(e.currentTarget.value)}
-                    disabled={isFormDisabled}
+                    disabled={shouldDisableForm}
                     class="w-full pl-8 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
                     autofocus
                   />
@@ -1134,7 +1411,7 @@
           id="description"
           name="description"
           rows="4"
-          disabled={isFormDisabled}
+          disabled={shouldDisableForm}
           class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
           placeholder="Enter report description"
         ></textarea>
@@ -1152,7 +1429,7 @@
             <button
               type="button"
               onclick={toggleAddMediaDropdown}
-              disabled={isFormDisabled}
+              disabled={shouldDisableForm}
               class="w-full px-4 py-3 text-base border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
               <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1449,15 +1726,128 @@
                   <label class="block text-sm font-medium text-gray-700 mb-2">
                     Media Type *
                   </label>
-                  <select
-                    bind:value={currentMediaType}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="notes">Notes/Text</option>
-                    <option value="url">URL Link</option>
-                    <option value="audio">Audio File</option>
-                    <option value="video">Video File</option>
-                  </select>
+                  <div class="relative">
+                    <button
+                      type="button"
+                      onclick={() => {
+                        const dropdown = document.getElementById('edit-media-type-dropdown');
+                        dropdown?.classList.toggle('hidden');
+                      }}
+                      class="w-full px-4 py-3 text-base text-left border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between"
+                    >
+                      <div class="flex items-center space-x-3">
+                        {#if currentMediaType === 'notes'}
+                          <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">Notes</div>
+                            <div class="text-xs text-gray-500">Text notes or observations</div>
+                          </div>
+                        {:else if currentMediaType === 'url'}
+                          <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">URL Link</div>
+                            <div class="text-xs text-gray-500">Website or online resource</div>
+                          </div>
+                        {:else if currentMediaType === 'audio'}
+                          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">Audio File</div>
+                            <div class="text-xs text-gray-500">MP3, M4A, WAV, AAC</div>
+                          </div>
+                        {:else if currentMediaType === 'video'}
+                          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">Video File</div>
+                            <div class="text-xs text-gray-500">MP4, AVI, MOV, WMV, MKV</div>
+                          </div>
+                        {/if}
+                      </div>
+                      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    
+                    <!-- Dropdown Options -->
+                    <div id="edit-media-type-dropdown" class="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
+                      <div class="p-2">
+                        <button
+                          type="button"
+                          onclick={() => {
+                            currentMediaType = 'notes';
+                            document.getElementById('edit-media-type-dropdown')?.classList.add('hidden');
+                          }}
+                          class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                        >
+                          <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">Notes</div>
+                            <div class="text-xs text-gray-500">Text notes or observations</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onclick={() => {
+                            currentMediaType = 'url';
+                            document.getElementById('edit-media-type-dropdown')?.classList.add('hidden');
+                          }}
+                          class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                        >
+                          <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">URL Link</div>
+                            <div class="text-xs text-gray-500">Website or online resource</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onclick={() => {
+                            currentMediaType = 'audio';
+                            document.getElementById('edit-media-type-dropdown')?.classList.add('hidden');
+                          }}
+                          class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                        >
+                          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">Audio File</div>
+                            <div class="text-xs text-gray-500">MP3, M4A, WAV, AAC</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onclick={() => {
+                            currentMediaType = 'video';
+                            document.getElementById('edit-media-type-dropdown')?.classList.add('hidden');
+                          }}
+                          class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                        >
+                          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900">Video File</div>
+                            <div class="text-xs text-gray-500">MP4, AVI, MOV, WMV, MKV</div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {#if currentMediaType === 'url'}
@@ -1544,10 +1934,10 @@
                   <button
                     type="button"
                     onclick={saveEditedItem}
-                    disabled={isFormDisabled}
+                    disabled={shouldDisableForm}
                     class="px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed rounded-md transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
                   >
-                    {#if isFormDisabled}
+                    {#if shouldDisableForm}
                       <div class="flex items-center space-x-2">
                         <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1555,7 +1945,7 @@
                         <span>Updating...</span>
                       </div>
                     {:else}
-                      Update {editingItem.type === 'url' ? 'Link' : editingItem.type === 'notes' ? 'Notes' : editingItem.type.charAt(0).toUpperCase() + editingItem.type.slice(1)}
+                      Update Content
                     {/if}
                   </button>
                 </div>
@@ -1579,29 +1969,33 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   {#each mediaItems as item (item.id)}
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 {item.markedForDeletion ? 'opacity-50 bg-red-50' : ''}">
                       <td class="px-4 py-3 whitespace-nowrap">
-                        <div class="flex items-center">
-                          {#if item.type === 'audio'}
-                            <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2">
+                          <div class="flex items-center space-x-1">
+                            {#if item.type === 'audio'}
                               <div class="w-2 h-2 bg-blue-600 rounded-full"></div>
                               <span class="text-xs font-medium text-blue-600 uppercase">Audio</span>
-                            </div>
-                          {:else if item.type === 'video'}
-                            <div class="flex items-center space-x-2">
+                            {:else if item.type === 'video'}
                               <div class="w-2 h-2 bg-green-600 rounded-full"></div>
                               <span class="text-xs font-medium text-green-600 uppercase">Video</span>
-                            </div>
-                          {:else if item.type === 'url'}
-                            <div class="flex items-center space-x-2">
+                            {:else if item.type === 'url'}
                               <div class="w-2 h-2 bg-purple-600 rounded-full"></div>
                               <span class="text-xs font-medium text-purple-600 uppercase">URL</span>
-                            </div>
-                          {:else if item.type === 'notes'}
-                            <div class="flex items-center space-x-2">
+                            {:else if item.type === 'notes'}
                               <div class="w-2 h-2 bg-amber-600 rounded-full"></div>
                               <span class="text-xs font-medium text-amber-600 uppercase">Notes</span>
-                            </div>
+                            {/if}
+                          </div>
+                          
+                          {#if item.markedForDeletion === true}
+                            <span class="text-xs text-red-600 bg-red-100 px-2 py-1 rounded font-medium">
+                              Marked for Deletion
+                            </span>
+                          {:else if item.hasChanges === true}
+                            <span class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded font-medium">
+                              Modified
+                            </span>
                           {/if}
                         </div>
                       </td>
@@ -1646,37 +2040,71 @@
                       <td class="px-4 py-3 whitespace-nowrap">
                         <div class="flex items-center space-x-2">
                           {#if item.isExisting && isEditMode}
-                            <!-- Edit and Delete buttons for existing items in edit mode -->
-                            <button
-                              type="button"
-                              onclick={() => startEditItem(item)}
-                              disabled={isFormDisabled}
-                              class="text-blue-600 hover:text-blue-800 p-1 rounded disabled:opacity-50"
-                              title="Edit this item"
-                              aria-label="Edit media item"
-                            >
-                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              type="button"
-                              onclick={() => deleteExistingItem(item)}
-                              disabled={isFormDisabled}
-                              class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
-                              title="Delete this item permanently"
-                              aria-label="Delete media item"
-                            >
-                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
+                            {#if item.markedForDeletion === true}
+                              <!-- Cancel Deletion button for items marked for deletion -->
+                              <button
+                                type="button"
+                                onclick={() => cancelDeletion(item)}
+                                disabled={shouldDisableForm}
+                                class="text-green-600 hover:text-green-800 p-1 rounded disabled:opacity-50"
+                                title="Cancel deletion and restore item"
+                                aria-label="Cancel deletion"
+                              >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                              </button>
+                            {:else}
+                              <!-- Edit button (only for non-deleted items) -->
+                              <button
+                                type="button"
+                                onclick={() => startEditItem(item)}
+                                disabled={shouldDisableForm}
+                                class="text-blue-600 hover:text-blue-800 p-1 rounded disabled:opacity-50"
+                                title="Edit this item"
+                                aria-label="Edit media item"
+                              >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              
+                              {#if item.hasChanges === true}
+                                <!-- Cancel Operation button for modified items -->
+                                <button
+                                  type="button"
+                                  onclick={() => cancelOperation(item)}
+                                  disabled={shouldDisableForm}
+                                  class="text-orange-600 hover:text-orange-800 p-1 rounded disabled:opacity-50"
+                                  title="Cancel changes and revert to original data"
+                                  aria-label="Cancel operation"
+                                >
+                                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              {:else}
+                                <!-- Delete button for unmodified items -->
+                                <button
+                                  type="button"
+                                  onclick={() => deleteExistingItem(item)}
+                                  disabled={shouldDisableForm}
+                                  class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                                  title="Mark for deletion"
+                                  aria-label="Delete media item"
+                                >
+                                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              {/if}
+                            {/if}
                           {:else}
                             <!-- Remove button for new items or in create mode -->
                             <button
                               type="button"
                               onclick={() => removeMediaItem(item.id)}
-                              disabled={isFormDisabled}
+                              disabled={shouldDisableForm}
                               class="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
                               title="Remove item"
                               aria-label="Remove media item"
@@ -1713,6 +2141,23 @@
         {/if}
       </div>
 
+      <!-- Update Completed Notice -->
+      {#if isUpdateCompleted}
+        <div class="mt-6 p-4 border border-green-200 rounded-lg bg-green-50">
+          <div class="flex items-center space-x-3">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <div class="text-sm font-medium text-green-900">Update Completed Successfully</div>
+              <div class="text-xs text-green-700 mt-1">
+                The form has been disabled. Click "Reset" to make new changes or select new data from browse to continue.
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
+
       <!-- Form Actions -->
       <div class="flex items-center justify-end space-x-4 pt-4">
         <button
@@ -1725,7 +2170,7 @@
         </button>
         <button
           type="submit"
-          disabled={isSubmitting || selectedDocumentId === '' || mediaItems.length === 0}
+          disabled={isSubmitting || selectedDocumentId === '' || mediaItems.length === 0 || isUpdateCompleted}
           class="px-6 py-3 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
         >
           {#if isSubmitting}
@@ -1739,3 +2184,15 @@
     </form>
   </div>
 </div>
+
+<!-- Confirmation Modal for Cancel Operation -->
+<ConfirmationModal 
+  bind:isOpen={showCancelOperationModal}
+  title="Cancel Changes"
+  message={itemToCancel ? `Cancel changes to this ${itemToCancel.type} item? This will revert back to the original data.` : ''}
+  confirmText="Cancel Changes"
+  cancelText="Keep Changes"
+  confirmButtonClass="bg-orange-600 hover:bg-orange-700 text-white"
+  onConfirm={handleCancelOperationConfirm}
+  onCancel={handleCancelOperationCancel}
+/>
