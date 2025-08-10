@@ -160,17 +160,13 @@
   }
 </script>
 
-<div class="p-6 relative">
+<div class="p-6 pt-16 sm:pt-12 relative">
   <!-- Loading Overlay -->
   {#if isSubmitting}
     <Loading overlay={true} text={isEditMode ? 'Updating category...' : 'Saving category...'} />
   {/if}
   
-  <div class="max-w-6xl mx-auto">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">
-      {isEditMode ? 'Edit Category' : 'Add New Category'}
-    </h2>
-    
+  <div class="max-w-6xl mx-auto">    
     <div bind:this={formRef} class="space-y-6">
       <!-- Category Name -->
       <div>

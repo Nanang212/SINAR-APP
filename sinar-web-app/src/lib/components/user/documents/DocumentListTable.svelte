@@ -439,7 +439,7 @@
             <th
               class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[120px]"
             >
-              Downloaded
+              Status
             </th>
             <th
               class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]"
@@ -483,12 +483,17 @@
                     <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
                   </svg>
                   <div class="min-w-0 flex-1">
-                    <div class="text-sm font-medium text-gray-900 truncate">
-                      {doc.title}
+                    <div class="text-sm font-medium text-gray-900 truncate" title={doc.title}>
+                      {doc.title.length > 60 ? doc.title.substring(0, 60) + '...' : doc.title}
                     </div>
-                    <div class="text-xs sm:text-sm text-gray-500 truncate max-w-[150px] sm:max-w-xs" title={doc.original_name}>
-                      {doc.original_name}
+                    <div class="text-xs sm:text-sm text-gray-500 truncate" title={doc.original_name}>
+                      {doc.original_name.length > 45 ? doc.original_name.substring(0, 45) + '...' : doc.original_name}
                     </div>
+                    {#if doc.remark}
+                      <div class="text-xs text-gray-400 mt-1 truncate" title={doc.remark}>
+                        {doc.remark.length > 80 ? doc.remark.substring(0, 80) + '...' : doc.remark}
+                      </div>
+                    {/if}
                   </div>
                 </div>
               </td>

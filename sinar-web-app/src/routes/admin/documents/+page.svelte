@@ -7,6 +7,7 @@
   let documentTableRef = $state<DocumentTable>();
   let selectedDocument = $state<Document | null>(null);
   let searchTerm = $state("");
+  let sortOrder = $state<'asc' | 'desc'>('desc');
   let isLoading = $state(false);
 
   function handleTabChange(tab: string) {
@@ -23,13 +24,22 @@
   }
 
   function handleSearch(term: string) {
+    console.log('Page: Search term:', term);
     searchTerm = term;
     if (documentTableRef) {
-      documentTableRef.setSearchTerm(term);
+      documentTableRef.setSearchParams(term, sortOrder);
     }
   }
 
-  function handleRefresh() {
+  function handleSortChange(order: 'asc' | 'desc') {
+    sortOrder = order;
+    if (documentTableRef) {
+      documentTableRef.setSearchParams(searchTerm, order);
+    }
+  }
+
+  async function handleRefresh() {
+    console.log('Page: Refreshing documents...');
     isLoading = true;
     if (documentTableRef) {
       documentTableRef.loadDocuments().finally(() => {
@@ -81,15 +91,17 @@
           {activeTab} 
           onTabChange={handleTabChange}
           onSearch={handleSearch}
+          onSortChange={handleSortChange}
           onRefresh={handleRefresh}
           {searchTerm}
+          {sortOrder}
           {isLoading}
         />
       </div>
     </div>
     
     <!-- Tab Content -->
-    <div class="absolute inset-0 pt-[100px] overflow-y-auto overflow-x-hidden">
+    <div class="absolute inset-0 pt-[120px] sm:pt-[130px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
       {#if activeTab === "input"}
         <DocumentForm onSubmit={handleFormSubmit} onReset={handleFormReset} documentData={selectedDocument} />
       {:else if activeTab === "browse"}
@@ -99,6 +111,8 @@
           onDelete={handleDocumentDelete}
           onRefresh={() => console.log('Documents refreshed')}
           onRowClick={handleRowClick}
+          {searchTerm}
+          {sortOrder}
         />
       {/if}
     </div>

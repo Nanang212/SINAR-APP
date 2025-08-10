@@ -63,10 +63,29 @@ class DocumentService {
   /**
    * Get all documents
    */
-  async getAllDocuments(): Promise<ApiResponse<Document[]>> {
+  async getAllDocuments(params?: { search?: string; order?: 'asc' | 'desc' }): Promise<ApiResponse<Document[]>> {
     try {
+      const queryParams = new URLSearchParams();
+
+      // Add search parameter if provided
+      if (params?.search && params.search.trim() !== '') {
+        queryParams.append('search', params.search.trim());
+      }
+
+      // Add order parameter if provided
+      if (params?.order && (params.order === 'asc' || params.order === 'desc')) {
+        queryParams.append('order', params.order);
+      }
+
+      const fullUrl = queryParams.toString() 
+        ? `${this.baseEndpoint}?${queryParams.toString()}`
+        : this.baseEndpoint;
+
+      console.log('🚀 Document Service - Making request to:', fullUrl);
+      console.log('📋 Request parameters:', params);
+
       const response = await httpClient.authenticatedRequest<DocumentsResponse>(
-        this.baseEndpoint
+        fullUrl
       );
 
       console.log('Document service - raw response:', response);

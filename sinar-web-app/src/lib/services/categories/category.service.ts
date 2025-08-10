@@ -33,6 +33,13 @@ export interface GetCategoriesParams {
   page?: number;
 }
 
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  order?: 'asc' | 'desc';
+}
+
 class CategoryService {
   private readonly baseEndpoint = '/api/v1/categories';
   private readonly adminBaseEndpoint = '/api/v1/admin/categories';
@@ -121,7 +128,7 @@ class CategoryService {
   /**
    * Get all categories with pagination
    */
-  async getAllCategoriesWithPagination(params?: GetCategoriesParams): Promise<ApiResponse<CategoriesResponse>> {
+  async getAllCategoriesWithPagination(params?: PaginationParams): Promise<ApiResponse<CategoriesResponse>> {
     try {
       const queryParams = new URLSearchParams();
       if (params?.limit) {
@@ -129,6 +136,12 @@ class CategoryService {
       }
       if (params?.page) {
         queryParams.append('page', params.page.toString());
+      }
+      if (params?.search) {
+        queryParams.append('search', params.search);
+      }
+      if (params?.order) {
+        queryParams.append('order', params.order);
       }
 
       const url = `${this.baseEndpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;

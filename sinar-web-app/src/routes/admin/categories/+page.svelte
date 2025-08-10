@@ -7,6 +7,7 @@
   // Component state
   let activeTab = $state("input");
   let searchTerm = $state("");
+  let sortOrder = $state<'asc' | 'desc'>('desc');
   let isLoading = $state(false);
   let selectedCategory = $state<Category | null>(null);
 
@@ -31,7 +32,14 @@
     console.log('Page: Search term:', term);
     searchTerm = term;
     if (categoryTableRef) {
-      categoryTableRef.setSearchTerm(term);
+      categoryTableRef.setSearchParams(term, sortOrder);
+    }
+  }
+
+  function handleSortChange(order: 'asc' | 'desc') {
+    sortOrder = order;
+    if (categoryTableRef) {
+      categoryTableRef.setSearchParams(searchTerm, order);
     }
   }
 
@@ -126,15 +134,17 @@
           {activeTab} 
           onTabChange={handleTabChange}
           onSearch={handleSearch}
+          onSortChange={handleSortChange}
           onRefresh={handleRefresh}
           {searchTerm}
+          {sortOrder}
           {isLoading}
         />
       </div>
     </div>
     
     <!-- Tab Content -->
-    <div class="absolute inset-0 pt-[100px] overflow-y-auto overflow-x-hidden">
+    <div class="absolute inset-0 pt-[120px] sm:pt-[130px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
       {#if activeTab === "input"}
         <CategoryForm 
           categoryData={selectedCategory}
@@ -148,6 +158,8 @@
           onDelete={handleCategoryDelete}
           onRefresh={() => console.log('Categories refreshed')}
           onRowClick={handleCategoryRowClick}
+          {searchTerm}
+          {sortOrder}
         />
       {/if}
     </div>
