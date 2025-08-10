@@ -14,6 +14,8 @@
   let volume = 1.0;
   let isLoading = false;
   let error = '';
+  let showClickIndicator = false;
+  let clickIndicatorTimeout: number;
 
   // Modal position, dragging, and resizing
   let modalElement: HTMLDivElement;
@@ -30,7 +32,15 @@
   let loadVideoRetryCount = 0;
   const MAX_RETRY_COUNT = 3;
 
-  // Initialize modal position to center
+  // Keyboard event listener for spacebar
+  function handleKeydown(event: KeyboardEvent) {
+    if (isOpen && event.code === 'Space') {
+      event.preventDefault();
+      togglePlayPause();
+    }
+  }
+
+  // Initialize modal position to center and add keyboard listener
   onMount(() => {
     if (typeof window !== 'undefined') {
       modalPosition.x = (window.innerWidth - modalSize.width) / 2;
@@ -40,6 +50,9 @@
         videoElement.volume = volume;
       }
     }
+    
+    // Add keyboard event listener
+    document.addEventListener('keydown', handleKeydown);
   });
 
   // Prevent multiple calls to loadVideo
@@ -143,6 +156,13 @@
 
   async function togglePlayPause() {
     if (!videoElement) return;
+
+    // Show click indicator
+    showClickIndicator = true;
+    clearTimeout(clickIndicatorTimeout);
+    clickIndicatorTimeout = setTimeout(() => {
+      showClickIndicator = false;
+    }, 600);
 
     try {
       if (isPlaying) {
@@ -341,9 +361,11 @@
     onClose();
   }
 
+
   onDestroy(() => {
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
+    document.removeEventListener('keydown', handleKeydown);
   });
 </script>
 
@@ -405,10 +427,12 @@
         {:else}
           <video
             bind:this={videoElement}
-            class="w-full h-full object-contain"
+            class="w-full h-full object-contain cursor-pointer"
             preload="metadata"
             controls={false}
             muted={false}
+            onclick={togglePlayPause}
+            style="pointer-events: auto;"
             onloadeddata={handleLoadedData}
             onerror={handleLoadError}
             ontimeupdate={handleTimeUpdate}
@@ -445,15 +469,29 @@
           
           <!-- Play overlay for paused state -->
           {#if !isPlaying && !isLoading}
-            <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
-              <button
-                onclick={togglePlayPause}
-                class="flex items-center justify-center w-16 h-16 bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-800 rounded-full transition-all transform hover:scale-105 shadow-lg"
-              >
+            <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 cursor-pointer" onclick={togglePlayPause}>
+              <div class="flex items-center justify-center w-16 h-16 bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-800 rounded-full shadow-lg transition-all transform hover:scale-105">
                 <svg class="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
                 </svg>
-              </button>
+              </div>
+            </div>
+          {/if}
+          
+          <!-- Click indicator (YouTube-style) -->
+          {#if showClickIndicator}
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div class="flex items-center justify-center w-20 h-20 bg-black bg-opacity-60 text-white rounded-full shadow-lg animate-ping">
+                {#if isPlaying}
+                  <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6" />
+                  </svg>
+                {:else}
+                  <svg class="w-10 h-10 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                {/if}
+              </div>
             </div>
           {/if}
         {/if}
@@ -523,28 +561,10 @@
             </div>
           </div>
 
-          <!-- Control Buttons & Volume - Responsive Layout -->
-          <div class="flex items-center {modalSize.width < 400 ? 'flex-col space-y-2' : 'justify-between'}">
-            
-            <!-- Play/Pause Button with responsive size -->
-            <button
-              onclick={togglePlayPause}
-              class="flex items-center justify-center {modalSize.width < 400 ? 'w-10 h-10' : 'w-12 h-12'} bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-full hover:from-red-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg"
-              disabled={isLoading}
-            >
-              {#if isPlaying}
-                <svg class="{modalSize.width < 400 ? 'w-4 h-4' : 'w-5 h-5'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6" />
-                </svg>
-              {:else}
-                <svg class="{modalSize.width < 400 ? 'w-4 h-4' : 'w-5 h-5'} ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              {/if}
-            </button>
-
+          <!-- Volume Control - Centered Layout -->
+          <div class="flex items-center justify-center">
             <!-- Volume Control with responsive layout -->
-            <div class="flex items-center space-x-2 {modalSize.width < 400 ? 'w-full' : 'flex-1 ml-4'}">
+            <div class="flex items-center space-x-2 {modalSize.width < 400 ? 'w-full' : 'w-96'}">
               <svg class="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M9 12a3 3 0 106 0v-1a3 3 0 00-6 0v1z" />
               </svg>
