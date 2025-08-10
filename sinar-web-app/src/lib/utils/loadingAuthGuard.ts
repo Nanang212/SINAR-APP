@@ -55,14 +55,21 @@ export class LoadingAuthGuard {
   }
 
   /**
-   * Guard for login page with loading - redirect to home if already authenticated
+   * Guard for login page with loading - redirect based on user role if already authenticated
    */
   static async guardLoginPage(onLoading?: (loading: boolean) => void): Promise<boolean> {
-    return this.checkAccess({
-      redirectIfAuth: true,
-      redirectTo: '/home',
-      onLoading
-    });
+    if (authService.isAuthenticated()) {
+      const userRole = authService.getCurrentUserRole();
+      const redirectPath = userRole === 'admin' ? '/home' : '/user/documents';
+      
+      return this.checkAccess({
+        redirectIfAuth: true,
+        redirectTo: redirectPath,
+        onLoading
+      });
+    }
+    
+    return true;
   }
 
   /**
@@ -85,6 +92,50 @@ export class LoadingAuthGuard {
       redirectTo: '/login',
       onLoading
     });
+  }
+
+  /**
+   * Guard for admin-only pages with loading
+   */
+  static async guardAdminPage(onLoading?: (loading: boolean) => void): Promise<boolean> {
+    const isAuthenticated = await this.guardProtectedPage(onLoading);
+    if (!isAuthenticated) return false;
+
+    const user = authService.getCurrentUser();
+    const hasAdminRole = user?.role === 'admin';
+    if (!hasAdminRole) {
+      if (onLoading) onLoading(true);
+      
+      // Minimum delay for smooth transition
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      NavigationHelper.navigateTo('/user/documents'); // Redirect user to their documents
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Guard for dashboard/home page - admin only, user redirected to documents
+   */
+  static async guardDashboardPage(onLoading?: (loading: boolean) => void): Promise<boolean> {
+    const isAuthenticated = await this.guardProtectedPage(onLoading);
+    if (!isAuthenticated) return false;
+
+    const user = authService.getCurrentUser();
+    const hasAdminRole = user?.role === 'admin';
+    if (!hasAdminRole) {
+      if (onLoading) onLoading(true);
+      
+      // Minimum delay for smooth transition
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      NavigationHelper.navigateTo('/user/documents'); // Redirect user to their documents
+      return false;
+    }
+
+    return true;
   }
 }
 

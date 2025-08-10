@@ -10,8 +10,8 @@
   onMount(() => {
     // Async initialization
     (async () => {
-      // Guard home page with loading - redirect to login if not authenticated
-      const access = await LoadingAuthGuard.guardHomePage((loading) => {
+      // Guard dashboard page - admin only, user redirected to documents
+      const access = await LoadingAuthGuard.guardDashboardPage((loading) => {
         showRedirectLoading = loading;
       });
 
@@ -34,5 +34,5 @@
 
 <!-- Redirect loading overlay -->
 {#if showRedirectLoading}
-  <Loading overlay={true} text="Redirecting to login..." />
+  <Loading overlay={true} text="Redirecting..." />
 {/if}

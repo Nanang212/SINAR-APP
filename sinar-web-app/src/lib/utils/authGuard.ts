@@ -43,13 +43,20 @@ export class AuthGuard {
   }
 
   /**
-   * Guard for login page - redirect to home if already authenticated
+   * Guard for login page - redirect based on user role if already authenticated
    */
   static guardLoginPage(): boolean {
-    return this.checkAccess({
-      redirectIfAuth: true,
-      redirectTo: '/home'
-    });
+    if (authService.isAuthenticated()) {
+      const userRole = authService.getCurrentUserRole();
+      const redirectPath = userRole === 'admin' ? '/home' : '/user/documents';
+      
+      return this.checkAccess({
+        redirectIfAuth: true,
+        redirectTo: redirectPath
+      });
+    }
+    
+    return true;
   }
 
   /**

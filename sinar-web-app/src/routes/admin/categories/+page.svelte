@@ -1,8 +1,22 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { LoadingAuthGuard } from "$lib/utils";
+  import { Loading } from "$lib";
   import { DashboardLayout } from "$lib";
   import { CategoryTabs, CategoryTable, CategoryForm } from "@/lib/components/admin/categories";
   import type { Category, CreateCategoryRequest, UpdateCategoryRequest } from "@/lib/services/categories/category.service";
   import { categoryService } from "@/lib/services";
+
+  let hasAccess = $state(false);
+  let showRedirectLoading = $state(false);
+
+  onMount(async () => {
+    // Guard admin page with loading - redirect if not authenticated or not admin
+    const access = await LoadingAuthGuard.guardAdminPage((loading) => {
+      showRedirectLoading = loading;
+    });
+    hasAccess = access;
+  });
 
   // Component state
   let activeTab = $state("input");
@@ -123,45 +137,52 @@
 </svelte:head>
 
 <DashboardLayout>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 relative" style="height: calc(100vh - 150px);">
-    <!-- Gradient line at top -->
-    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 z-10 rounded-t-lg"></div>
-    
-    <!-- Fixed Header and Tabs -->
-    <div class="absolute top-1 left-0 right-0 bg-white z-20 border-b border-gray-200 shadow-sm">
-      <div class="px-6 pt-5 pb-4">
-        <CategoryTabs 
-          {activeTab} 
-          onTabChange={handleTabChange}
-          onSearch={handleSearch}
-          onSortChange={handleSortChange}
-          onRefresh={handleRefresh}
-          {searchTerm}
-          {sortOrder}
-          {isLoading}
-        />
+  {#if hasAccess}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 relative" style="height: calc(100vh - 150px);">
+      <!-- Gradient line at top -->
+      <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 z-10 rounded-t-lg"></div>
+      
+      <!-- Fixed Header and Tabs -->
+      <div class="absolute top-1 left-0 right-0 bg-white z-20 border-b border-gray-200 shadow-sm">
+        <div class="px-6 pt-5 pb-4">
+          <CategoryTabs 
+            {activeTab} 
+            onTabChange={handleTabChange}
+            onSearch={handleSearch}
+            onSortChange={handleSortChange}
+            onRefresh={handleRefresh}
+            {searchTerm}
+            {sortOrder}
+            {isLoading}
+          />
+        </div>
+      </div>
+      
+      <!-- Tab Content -->
+      <div class="absolute inset-0 pt-[120px] sm:pt-[130px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
+        {#if activeTab === "input"}
+          <CategoryForm 
+            categoryData={selectedCategory}
+            onSubmit={handleFormSubmit}
+            onReset={handleReset}
+          />
+        {:else if activeTab === "browse"}
+          <CategoryTable 
+            bind:this={categoryTableRef}
+            fetchOnMount={true}
+            onDelete={handleCategoryDelete}
+            onRefresh={() => console.log('Categories refreshed')}
+            onRowClick={handleCategoryRowClick}
+            {searchTerm}
+            {sortOrder}
+          />
+        {/if}
       </div>
     </div>
-    
-    <!-- Tab Content -->
-    <div class="absolute inset-0 pt-[120px] sm:pt-[130px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
-      {#if activeTab === "input"}
-        <CategoryForm 
-          categoryData={selectedCategory}
-          onSubmit={handleFormSubmit}
-          onReset={handleReset}
-        />
-      {:else if activeTab === "browse"}
-        <CategoryTable 
-          bind:this={categoryTableRef}
-          fetchOnMount={true}
-          onDelete={handleCategoryDelete}
-          onRefresh={() => console.log('Categories refreshed')}
-          onRowClick={handleCategoryRowClick}
-          {searchTerm}
-          {sortOrder}
-        />
-      {/if}
-    </div>
-  </div>
+  {/if}
 </DashboardLayout>
+
+<!-- Redirect loading overlay -->
+{#if showRedirectLoading}
+  <Loading overlay={true} text="Redirecting..." />
+{/if}

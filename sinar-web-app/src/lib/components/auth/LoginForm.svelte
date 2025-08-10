@@ -1,6 +1,7 @@
 <script lang="ts">
   import { loginHandler } from './loginHandler';
   import { NavigationHelper } from '$lib/utils/navigation';
+  import { authService } from '$lib/services';
   import { Loading } from '$lib';
   import { onMount } from 'svelte';
   
@@ -40,8 +41,10 @@
       // Wait for minimum delay before redirect
       await minDelay;
       
-      // Redirect to home page after successful login
-      NavigationHelper.goHome();
+      // Role-based redirect after successful login
+      const userRole = authService.getCurrentUserRole();
+      const redirectPath = userRole === 'admin' ? '/home' : '/user/documents';
+      NavigationHelper.navigateTo(redirectPath);
     }
     // Error handling is done by the handler
   }

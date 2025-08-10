@@ -1,8 +1,22 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { LoadingAuthGuard } from "$lib/utils";
+  import { Loading } from "$lib";
   import { DashboardLayout } from "$lib";
   import { UserTabs, UserTable, UserForm } from "@/lib/components/admin/users";
   import type { User, CreateUserRequest, UpdateUserRequest } from "@/lib/services/users/user.service";
   import { userService } from "@/lib/services";
+
+  let hasAccess = $state(false);
+  let showRedirectLoading = $state(false);
+
+  onMount(async () => {
+    // Guard admin page with loading - redirect if not authenticated or not admin
+    const access = await LoadingAuthGuard.guardAdminPage((loading) => {
+      showRedirectLoading = loading;
+    });
+    hasAccess = access;
+  });
 
   // Component state
   let activeTab = $state("input");
@@ -115,41 +129,48 @@
 </svelte:head>
 
 <DashboardLayout>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 relative" style="height: calc(100vh - 150px);">
-    <!-- Gradient line at top -->
-    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 z-10 rounded-t-lg"></div>
-    
-    <!-- Fixed Header and Tabs -->
-    <div class="absolute top-1 left-0 right-0 bg-white z-20 border-b border-gray-200 shadow-sm">
-      <div class="px-6 pt-5 pb-4">
-        <UserTabs 
-          {activeTab} 
-          onTabChange={handleTabChange}
-          onSearch={handleSearch}
-          onRefresh={handleRefresh}
-          {searchTerm}
-          {isLoading}
-        />
+  {#if hasAccess}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 relative" style="height: calc(100vh - 150px);">
+      <!-- Gradient line at top -->
+      <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 z-10 rounded-t-lg"></div>
+      
+      <!-- Fixed Header and Tabs -->
+      <div class="absolute top-1 left-0 right-0 bg-white z-20 border-b border-gray-200 shadow-sm">
+        <div class="px-6 pt-5 pb-4">
+          <UserTabs 
+            {activeTab} 
+            onTabChange={handleTabChange}
+            onSearch={handleSearch}
+            onRefresh={handleRefresh}
+            {searchTerm}
+            {isLoading}
+          />
+        </div>
+      </div>
+      
+      <!-- Tab Content -->
+      <div class="absolute inset-0 pt-[100px] overflow-y-auto overflow-x-hidden">
+        {#if activeTab === "input"}
+          <UserForm 
+            userData={selectedUser}
+            onSubmit={handleFormSubmit}
+            onReset={handleReset}
+          />
+        {:else if activeTab === "browse"}
+          <UserTable 
+            bind:this={userTableRef}
+            fetchOnMount={true}
+            onDelete={handleUserDelete}
+            onRefresh={() => console.log('Users refreshed')}
+            onRowClick={handleUserRowClick}
+          />
+        {/if}
       </div>
     </div>
-    
-    <!-- Tab Content -->
-    <div class="absolute inset-0 pt-[100px] overflow-y-auto overflow-x-hidden">
-      {#if activeTab === "input"}
-        <UserForm 
-          userData={selectedUser}
-          onSubmit={handleFormSubmit}
-          onReset={handleReset}
-        />
-      {:else if activeTab === "browse"}
-        <UserTable 
-          bind:this={userTableRef}
-          fetchOnMount={true}
-          onDelete={handleUserDelete}
-          onRefresh={() => console.log('Users refreshed')}
-          onRowClick={handleUserRowClick}
-        />
-      {/if}
-    </div>
-  </div>
+  {/if}
 </DashboardLayout>
+
+<!-- Redirect loading overlay -->
+{#if showRedirectLoading}
+  <Loading overlay={true} text="Redirecting..." />
+{/if}
