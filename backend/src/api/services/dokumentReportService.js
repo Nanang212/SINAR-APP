@@ -32,7 +32,10 @@ exports.createReport = async ({ data, user }) => {
   }
 
   // 3. Cek akses kategori
-  if (user.role !== "admin" && doc.category_id !== user.category_id) {
+  const isAdmin = user.role?.toLowerCase() === "admin";
+  const hasAccess = doc.kategori?.some((cat) => cat.id === user.category_id);
+  
+  if (!isAdmin && !hasAccess) {
     throw {
       code: 403,
       message: "Forbidden: You can't submit report for this document",
@@ -67,7 +70,10 @@ exports.updateReport = async (id, data, user) => {
   }
 
   const doc = existing.document;
-  if (!doc || (user.role !== "admin" && doc.category_id !== user.category_id)) {
+  const isAdmin = user.role?.toLowerCase() === "admin";
+  const hasAccess = doc?.kategori?.some((cat) => cat.id === user.category_id);
+  
+  if (!doc || (!isAdmin && !hasAccess)) {
     throw {
       code: 403,
       message: "Forbidden: You can't update this report",
@@ -134,10 +140,10 @@ exports.downloadReportMedia = async ({ reportId, user }) => {
   }
 
   const doc = report.document;
-  if (
-    !doc ||
-    (user.role !== "admin" && doc.kategori?.id !== user.category_id)
-  ) {
+  const isAdmin = user.role?.toLowerCase() === "admin";
+  const hasAccess = doc?.kategori?.some((cat) => cat.id === user.category_id);
+  
+  if (!doc || (!isAdmin && !hasAccess)) {
     throw {
       code: 403,
       message: "Forbidden: You can't access this report",

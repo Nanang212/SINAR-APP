@@ -11,7 +11,10 @@ const {
 
 exports.getAllReports = async (req, res) => {
   try {
-    const result = await documentReportService.getAllReports(req.query);
+    const result = await documentReportService.getAllReports({
+      ...req.query,
+      user: req.user, // ← kirim user dari middleware auth
+    });
 
     successList(res, "Successfully fetched reports", {
       ...result,
@@ -244,11 +247,11 @@ exports.previewReportMedia = async (req, res) => {
 
     const user = req.user;
 
-    // Optional: validasi akses berdasarkan kategori jika perlu
-    if (
-      user.role !== "admin" &&
-      report.document?.kategori?.id !== user.category_id
-    ) {
+    // Validasi akses berdasarkan kategori - gunakan logic yang sama dengan download
+    const isAdmin = user.role?.toLowerCase() === "admin";
+    const hasAccess = report.document?.kategori?.some((cat) => cat.id === user.category_id);
+    
+    if (!isAdmin && !hasAccess) {
       return errorStatus(res, 403, "Forbidden: You can't access this report");
     }
 

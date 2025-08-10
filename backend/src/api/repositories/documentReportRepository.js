@@ -11,14 +11,27 @@ exports.findAllReports = async (params) => {
     order = "asc",
     search = "",
     where = {},
+    user, // ← user dari req.user
   } = params;
 
   const take = parseInt(limit, 10);
   const skip = (parseInt(page, 10) - 1) * take;
 
-  // Build where clause with search functionality
+  // 🛡 Filtering berdasarkan role & category
   let whereClause = { ...where };
-  
+
+  const isAdmin = user?.role?.toLowerCase() === "admin";
+  if (!isAdmin && user?.category_id) {
+    whereClause = {
+      ...whereClause,
+      document: {
+        kategori: {
+          some: { id: user.category_id },
+        },
+      },
+    };
+  }
+  // 🔍 Search
   if (search && search.trim() !== "") {
     whereClause = {
       ...whereClause,
@@ -26,28 +39,28 @@ exports.findAllReports = async (params) => {
         {
           description: {
             contains: search.trim(),
-            mode: 'insensitive'
-          }
+            mode: "insensitive",
+          },
         },
         {
           original_name: {
             contains: search.trim(),
-            mode: 'insensitive'
-          }
+            mode: "insensitive",
+          },
         },
         {
           document: {
             original_name: {
               contains: search.trim(),
-              mode: 'insensitive'
-            }
-          }
-        }
-      ]
+              mode: "insensitive",
+            },
+          },
+        },
+      ],
     };
   }
 
-  // Get all reports first to group by document_id
+  // ⬇ sisanya sama persis kayak punyamu sekarang
   const allReports = await prisma.documentReport.findMany({
     where: whereClause,
     select: {
@@ -77,18 +90,14 @@ exports.findAllReports = async (params) => {
       },
     },
     orderBy: [
-      {
-        updated_at: order.toLowerCase() === "desc" ? "desc" : "asc",
-      },
-      {
-        id: "desc" // Always descending for report id
-      }
-    ]
+      { updated_at: order.toLowerCase() === "desc" ? "desc" : "asc" },
+      { id: "desc" },
+    ],
   });
 
   // Group reports by document_id
   const groupedByDocument = {};
-  
+
   for (const report of allReports) {
     const documentId = report.document?.id;
     if (!documentId) continue;
@@ -144,9 +153,12 @@ exports.findAllReports = async (params) => {
     // Get the latest updated_at from all reports in each document group
     const getLatestUpdatedAt = (documentGroup) => {
       let latestDate = null;
-      Object.values(documentGroup.reports).forEach(reportTypeArray => {
-        reportTypeArray.forEach(report => {
-          if (!latestDate || new Date(report.updated_at) > new Date(latestDate)) {
+      Object.values(documentGroup.reports).forEach((reportTypeArray) => {
+        reportTypeArray.forEach((report) => {
+          if (
+            !latestDate ||
+            new Date(report.updated_at) > new Date(latestDate)
+          ) {
             latestDate = report.updated_at;
           }
         });
@@ -174,7 +186,7 @@ exports.findAllReports = async (params) => {
     data: paginatedData,
     totalPages: Math.ceil(totalDocuments / take),
     hasNext: skip + take < totalDocuments,
-    hasPrev: parseInt(page, 10) > 1
+    hasPrev: parseInt(page, 10) > 1,
   };
 };
 
@@ -198,6 +210,12 @@ exports.findReportById = async (id) => {
           id: true,
           original_name: true,
           url: true,
+          kategori: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
       user: {
