@@ -33,6 +33,13 @@ export interface User {
   email?: string;
   last_login?: string | null;
   profile_picture?: string | null;
+  logo?: string | null;
+  contact_person?: string;
+  name_mentri?: string;
+  // New response fields from updated API
+  filepath?: string;
+  original_name?: string;
+  logo_url?: string;
 }
 
 export interface UsersResponse {
@@ -40,6 +47,8 @@ export interface UsersResponse {
   code: number;
   message: string;
   total: number;
+  page: number;
+  limit: number;
   data: User[];
 }
 
@@ -48,6 +57,9 @@ export interface CreateUserRequest {
   password: string;
   role_id: number;
   category_id?: number | null;
+  contact_person?: string;
+  name_mentri?: string;
+  logo?: File | null;
 }
 
 export interface UpdateUserRequest {
@@ -55,6 +67,9 @@ export interface UpdateUserRequest {
   role_id?: number;
   category_id?: number | null;
   is_active?: boolean;
+  contact_person?: string;
+  name_mentri?: string;
+  logo?: File | null;
 }
 
 export interface ResetPasswordRequest {
@@ -64,6 +79,8 @@ export interface ResetPasswordRequest {
 export interface GetUsersParams {
   limit?: number;
   page?: number;
+  search?: string;
+  order?: 'asc' | 'desc';
 }
 
 class UserService {
@@ -81,6 +98,12 @@ class UserService {
       }
       if (params?.page) {
         queryParams.append('page', params.page.toString());
+      }
+      if (params?.search && params.search.trim()) {
+        queryParams.append('search', params.search.trim());
+      }
+      if (params?.order) {
+        queryParams.append('order', params.order);
       }
 
       const url = `${this.baseEndpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
@@ -195,15 +218,37 @@ class UserService {
   }
 
   /**
-   * Create new user
+   * Create new user with form data (including file upload)
    */
   async createUser(data: CreateUserRequest): Promise<ApiResponse<User>> {
     try {
+      // Create FormData for file upload support
+      const formData = new FormData();
+      
+      // Add required fields
+      formData.append('username', data.username);
+      formData.append('password', data.password);
+      formData.append('role_id', data.role_id.toString());
+      
+      // Add optional fields
+      if (data.category_id !== undefined && data.category_id !== null) {
+        formData.append('category_id', data.category_id.toString());
+      }
+      if (data.contact_person) {
+        formData.append('contact_person', data.contact_person);
+      }
+      if (data.name_mentri) {
+        formData.append('name_mentri', data.name_mentri);
+      }
+      if (data.logo) {
+        formData.append('logo', data.logo);
+      }
+
       const response = await httpClient.authenticatedRequest<UsersResponse>(
         `${this.adminBaseEndpoint}`,
         {
           method: 'POST',
-          body: data,
+          body: formData,
         }
       );
 
@@ -240,15 +285,41 @@ class UserService {
   }
 
   /**
-   * Update existing user
+   * Update existing user with form data (including file upload)
    */
   async updateUser(id: string | number, data: UpdateUserRequest): Promise<ApiResponse<User>> {
     try {
+      // Create FormData for file upload support
+      const formData = new FormData();
+      
+      // Add optional fields only if they exist
+      if (data.username) {
+        formData.append('username', data.username);
+      }
+      if (data.role_id !== undefined) {
+        formData.append('role_id', data.role_id.toString());
+      }
+      if (data.category_id !== undefined && data.category_id !== null) {
+        formData.append('category_id', data.category_id.toString());
+      }
+      if (data.is_active !== undefined) {
+        formData.append('is_active', data.is_active.toString());
+      }
+      if (data.contact_person) {
+        formData.append('contact_person', data.contact_person);
+      }
+      if (data.name_mentri) {
+        formData.append('name_mentri', data.name_mentri);
+      }
+      if (data.logo) {
+        formData.append('logo', data.logo);
+      }
+
       const response = await httpClient.authenticatedRequest<UsersResponse>(
         `${this.adminBaseEndpoint}/${id}`,
         {
           method: 'PUT',
-          body: data,
+          body: formData,
         }
       );
 

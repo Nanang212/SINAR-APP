@@ -8,6 +8,7 @@
   // Component state
   let activeTab = $state("browse");
   let searchTerm = $state("");
+  let sortOrder = $state<'asc' | 'desc'>('desc');
   let isLoading = $state(false);
   let selectedUser = $state<User | null>(null);
 
@@ -29,10 +30,25 @@
 
   // Search handler
   function handleSearch(term: string) {
-    console.log('Page: Search term:', term);
+    console.log('🏠 Page handleSearch called:', term);
+    console.log('- userTableRef exists?', !!userTableRef);
+    console.log('- current sortOrder:', sortOrder);
     searchTerm = term;
     if (userTableRef) {
-      userTableRef.setSearchTerm(term);
+      console.log('📞 Calling userTableRef.setSearchParams:', term, sortOrder);
+      userTableRef.setSearchParams(term, sortOrder);
+    }
+  }
+
+  // Sort handler
+  function handleSortChange(order: 'asc' | 'desc') {
+    console.log('🏠 Page handleSortChange called:', order);
+    console.log('- userTableRef exists?', !!userTableRef);
+    console.log('- current searchTerm:', searchTerm);
+    sortOrder = order;
+    if (userTableRef) {
+      console.log('📞 Calling userTableRef.setSearchParams:', searchTerm, order);
+      userTableRef.setSearchParams(searchTerm, order);
     }
   }
 
@@ -100,8 +116,10 @@
           {activeTab} 
           onTabChange={handleTabChange}
           onSearch={handleSearch}
+          onSortChange={handleSortChange}
           onRefresh={handleRefresh}
           {searchTerm}
+          {sortOrder}
           {isLoading}
         />
       </div>
@@ -121,6 +139,8 @@
           fetchOnMount={true}
           onRefresh={() => console.log('Users refreshed')}
           onRowClick={handleUserRowClick}
+          {searchTerm}
+          {sortOrder}
         />
       {/if}
     </div>

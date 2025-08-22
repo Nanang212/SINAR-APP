@@ -9,6 +9,7 @@
   let userName = $state("Admin");
   let userInitial = $state("A");
   let userRoleId = $state<number | null>(null);
+  let userLogo = $state<string | null>(null);
   let isLoggingOut = $state(false);
   let showLogoutOverlay = $state(false);
   let showProfileDropdown = $state(false);
@@ -34,6 +35,7 @@
           if (response.status && response.data) {
             userName = response.data.username;
             userInitial = response.data.username.charAt(0).toUpperCase();
+            userLogo = response.data.logo || null;
             
             // Debug: Log user data to check structure
             console.log('User data from API:', response.data);
@@ -45,6 +47,7 @@
                         null;
             
             console.log('Extracted userRoleId:', userRoleId);
+            console.log('User logo:', userLogo);
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
@@ -251,10 +254,27 @@
           <!-- User Avatar Button -->
           <button
             onclick={toggleProfileDropdown}
-            class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
+            class="w-8 h-8 rounded-full flex items-center justify-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 {userLogo ? '' : 'bg-blue-500 hover:bg-blue-600'}"
             title="Profile menu"
           >
-            <span class="text-white text-sm font-medium">{userInitial}</span>
+            {#if userLogo}
+              <img 
+                src={userLogo} 
+                alt="Profile" 
+                class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
+                onerror={(e) => {
+                  // Fallback to initial if image fails to load
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                }}
+              />
+              <!-- Fallback initial (hidden by default) -->
+              <span class="hidden w-8 h-8 bg-blue-500 rounded-full items-center justify-center text-white text-sm font-medium">
+                {userInitial}
+              </span>
+            {:else}
+              <span class="text-white text-sm font-medium">{userInitial}</span>
+            {/if}
           </button>
 
           <!-- Dropdown Menu -->

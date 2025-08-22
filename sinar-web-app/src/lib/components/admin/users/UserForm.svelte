@@ -26,6 +26,13 @@
   let selectedRoleId = $state<string>(''); // Will be set based on mode
   let isRoleDropdownOpen = $state(false);
   
+  // New fields
+  let contactPerson = $state('');
+  let nameMentri = $state('');
+  let logoFile = $state<File | null>(null);
+  let logoPreview = $state<string>('');
+  let currentLogoUrl = $state<string>('');
+  
   // Check if we're in edit mode
   const isEditMode = $derived(userData !== null);
 
@@ -92,6 +99,18 @@
     
     // Populate category
     selectedCategoryId = user.category_id ? user.category_id.toString() : '';
+    
+    // Populate new fields
+    contactPerson = user.contact_person || '';
+    nameMentri = user.name_mentri || '';
+    currentLogoUrl = user.logo || '';
+    
+    // Update form inputs
+    const contactInput = form.querySelector('#contact_person') as HTMLInputElement;
+    if (contactInput) contactInput.value = contactPerson;
+    
+    const mentriInput = form.querySelector('#name_mentri') as HTMLInputElement;
+    if (mentriInput) mentriInput.value = nameMentri;
   }
 
   function handleKeyDown(event: KeyboardEvent) {
@@ -104,6 +123,95 @@
     }
   }
 
+  // Handle file upload for logo
+  function handleLogoUpload(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    
+    if (file) {
+      validateAndSetLogoFile(file);
+    }
+  }
+
+  // Handle logo area click
+  function handleLogoAreaClick() {
+    const fileInput = formRef?.querySelector('#logo') as HTMLInputElement;
+    fileInput?.click();
+  }
+
+  // Handle drag and drop
+  function handleLogoDragOver(event: DragEvent) {
+    event.preventDefault();
+  }
+
+  function handleLogoDrop(event: DragEvent) {
+    event.preventDefault();
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      validateAndSetLogoFile(file);
+      
+      // Update file input
+      const fileInput = formRef?.querySelector('#logo') as HTMLInputElement;
+      if (fileInput) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        fileInput.files = dataTransfer.files;
+      }
+    }
+  }
+
+  // Validate and set logo file
+  function validateAndSetLogoFile(file: File) {
+    // Validate file type - only jpg and png
+    const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+    const fileName = file.name.toLowerCase();
+    const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!isValidType) {
+      modalToastStore.error('Only JPG and PNG image files are allowed');
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      modalToastStore.error('File size must be less than 5MB');
+      return;
+    }
+    
+    logoFile = file;
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      logoPreview = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Remove logo
+  function removeLogo() {
+    logoFile = null;
+    logoPreview = '';
+    const fileInput = formRef?.querySelector('#logo') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  }
+
+  // Auto-populate name_mentri based on selected category
+  $effect(() => {
+    if (selectedCategoryId && categories.length > 0) {
+      const selectedCategory = categories.find(cat => cat.id.toString() === selectedCategoryId);
+      if (selectedCategory && !isEditMode) {
+        // Only auto-populate in create mode
+        nameMentri = selectedCategory.name;
+        const mentriInput = formRef?.querySelector('#name_mentri') as HTMLInputElement;
+        if (mentriInput) mentriInput.value = nameMentri;
+      }
+    }
+  });
+
   async function handleFormSubmit() {
     if (isSubmitting) {
       console.log('Already submitting, ignoring duplicate submission');
@@ -114,6 +222,8 @@
     const formData = {
       username: (formRef.querySelector('#username') as HTMLInputElement)?.value || '',
       password: (formRef.querySelector('#password') as HTMLInputElement)?.value || '',
+      contact_person: (formRef.querySelector('#contact_person') as HTMLInputElement)?.value || '',
+      name_mentri: (formRef.querySelector('#name_mentri') as HTMLInputElement)?.value || '',
       is_active: true, // Default active for now
     };
     console.log('Form data:', formData);
@@ -133,6 +243,9 @@
           role_id: parseInt(selectedRoleId),
           category_id: selectedCategoryId ? parseInt(selectedCategoryId) : null,
           is_active: formData.is_active,
+          contact_person: formData.contact_person,
+          name_mentri: formData.name_mentri,
+          logo: logoFile,
         };
 
         console.log('Update data:', updateData);
@@ -157,6 +270,9 @@
           password: formData.password,
           role_id: parseInt(selectedRoleId),
           category_id: selectedCategoryId ? parseInt(selectedCategoryId) : null,
+          contact_person: formData.contact_person,
+          name_mentri: formData.name_mentri,
+          logo: logoFile,
         };
 
         const result = await userService.createUser(createData);
@@ -561,6 +677,122 @@
         <input type="hidden" name="category_id" value={selectedCategoryId} />
       </div>
 
+      <!-- Contact Person -->
+      <div>
+        <label for="contact_person" class="block text-sm font-medium text-gray-700 mb-2">
+          Contact Person
+        </label>
+        <input
+          type="text"
+          id="contact_person"
+          name="contact_person"
+          disabled={isFormDisabled}
+          onkeydown={handleKeyDown}
+          bind:value={contactPerson}
+          class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+          placeholder="Enter contact person"
+        />
+      </div>
+
+      <!-- Hidden Nama Menteri field - auto-populated based on category -->
+      <input type="hidden" id="name_mentri" name="name_mentri" bind:value={nameMentri} />
+
+      <!-- Profile Logo Upload -->
+      <div>
+        <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">
+          Profile Logo {isEditMode ? '(Optional - leave empty to keep current logo)' : ''}
+        </label>
+        
+        <!-- Drag and Drop Area -->
+        <div 
+          class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors {isFormDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"
+          onclick={!isFormDisabled ? handleLogoAreaClick : undefined}
+          ondragover={!isFormDisabled ? handleLogoDragOver : undefined}
+          ondrop={!isFormDisabled ? handleLogoDrop : undefined}
+          role="button"
+          tabindex="0"
+          onkeydown={(e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !isFormDisabled) {
+              e.preventDefault();
+              handleLogoAreaClick();
+            }
+          }}
+        >
+          {#if logoPreview || currentLogoUrl}
+            <!-- Show preview when file is selected -->
+            <div class="flex flex-col items-center">
+              <div class="relative mb-4">
+                <img
+                  src={logoPreview || currentLogoUrl}
+                  alt="Logo preview"
+                  class="w-24 h-24 object-cover rounded-full border-4 border-gray-200 shadow-md"
+                />
+                {#if logoPreview && !isFormDisabled}
+                  <button
+                    type="button"
+                    onclick={removeLogo}
+                    class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
+                    title="Remove logo"
+                    aria-label="Remove selected logo"
+                  >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                {/if}
+              </div>
+              
+              <div class="text-center">
+                {#if logoPreview}
+                  <div class="flex items-center justify-center mb-2">
+                    <svg class="h-6 w-6 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <p class="text-sm text-gray-900 font-medium">New logo selected</p>
+                  </div>
+                  {#if logoFile}
+                    <p class="text-xs text-gray-500">
+                      {logoFile.name} ({Math.round(logoFile.size / 1024)} KB)
+                    </p>
+                  {/if}
+                  <p class="mt-1 text-xs text-gray-500">Click to change logo</p>
+                {:else}
+                  <p class="text-sm text-gray-600">Current profile logo</p>
+                  <p class="mt-1 text-xs text-gray-500">Click to change logo</p>
+                {/if}
+              </div>
+            </div>
+          {:else}
+            <!-- Show upload area when no file selected -->
+            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+              <path d="M8 14s0-2 2-2 2 2 2 2m26 0s0-2 2-2 2 2 2 2M7 14s0 2 2 2 2-2 2-2m26 0s0 2 2 2 2-2 2-2M7 32s0-2 2-2 2 2 2 2m26 0s0-2 2-2 2 2 2 2M7 32s0 2 2 2 2-2 2-2m26 0s0 2 2 2 2-2 2-2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="24" cy="24" r="4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 24l-4-4 4-4M32 24l4-4-4-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="mt-4">
+              <p class="text-lg font-medium text-gray-600">Upload Profile Logo</p>
+              <p class="mt-2 text-sm text-gray-600">
+                <span class="font-medium text-blue-600 hover:text-blue-500">
+                  Click to upload
+                </span>
+                or drag and drop
+              </p>
+              <p class="text-xs text-gray-500 mt-1">Only JPG and PNG files up to 5MB</p>
+            </div>
+          {/if}
+          
+          <!-- Hidden file input -->
+          <input 
+            type="file" 
+            id="logo" 
+            name="logo" 
+            class="hidden" 
+            accept=".jpg,.jpeg,.png"
+            disabled={isFormDisabled}
+            onchange={handleLogoUpload}
+          />
+        </div>
+      </div>
 
       <!-- Form Actions -->
       <div class="flex items-center justify-end space-x-4 pt-4">
