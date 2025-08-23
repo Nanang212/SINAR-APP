@@ -10,6 +10,11 @@ exports.getAllReports = async (params) => {
   return await documentReportRepository.findAllReports(params);
 };
 
+// ✅ Get reports by date range
+exports.getReportsByDateRange = async (startDate, endDate, otherParams = {}) => {
+  return await documentReportRepository.findReportsByDateRange(startDate, endDate, otherParams);
+};
+
 // 🔍 Get single report by ID
 exports.getReportById = async (id) => {
   return await documentReportRepository.findReportById(id);

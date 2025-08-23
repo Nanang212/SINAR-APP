@@ -1,14 +1,45 @@
 const documentRepository = require("../repositories/documentRepository");
 const minioClient = require("../../config/minioClient");
-const { minio } = require("../../config/dotenv");
+const { minio, baseUrl } = require("../../config/dotenv");
 const { streamDocument } = require("../utils/minioHelper");
 
+// Helper function untuk format reports dengan URL
+const formatReportsWithUrls = (reports) => {
+  if (!reports || reports.length === 0) return null;
+  
+  return reports.map(report => ({
+    ...report,
+    download_url: ["AUDIO", "VIDEO"].includes(report.type) && report.id
+      ? `${baseUrl}/api/v1/admin/reports/download/${report.id}`
+      : null,
+    preview_url: ["AUDIO", "VIDEO"].includes(report.type) && report.id
+      ? `${baseUrl}/api/v1/admin/reports/preview/${report.id}`
+      : null,
+  }));
+};
+
 exports.getAllDocuments = async (params) => {
-  return await documentRepository.findAllDocuments(params);
+  const result = await documentRepository.findAllDocuments(params);
+  
+  // Format reports dengan URL untuk setiap document
+  if (result.data && Array.isArray(result.data)) {
+    result.data = result.data.map(doc => ({
+      ...doc,
+      reports: formatReportsWithUrls(doc.reports),
+    }));
+  }
+  
+  return result;
 };
 
 exports.getDocumentById = async (id) => {
-  return await documentRepository.findDocumentById(id);
+  const document = await documentRepository.findDocumentById(id);
+  
+  if (document) {
+    document.reports = formatReportsWithUrls(document.reports);
+  }
+  
+  return document;
 };
 
 exports.createDocument = async ({ data, createdBy }) => {

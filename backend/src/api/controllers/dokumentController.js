@@ -14,7 +14,40 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 exports.getAllDocuments = async (req, res) => {
   try {
-    const result = await documentService.getAllDocuments(req.query);
+    // Ambil parameter filter tanggal dari query
+    const { start_date, end_date } = req.query;
+
+    // Buat where condition untuk filter tanggal
+    let dateFilter = {};
+
+    if (start_date || end_date) {
+      dateFilter.uploaded_at = {};
+
+      if (start_date) {
+        // Set ke awal hari (00:00:00)
+        const startDateTime = new Date(start_date);
+        startDateTime.setHours(0, 0, 0, 0);
+        dateFilter.uploaded_at.gte = startDateTime;
+      }
+
+      if (end_date) {
+        // Set ke akhir hari (23:59:59)
+        const endDateTime = new Date(end_date);
+        endDateTime.setHours(23, 59, 59, 999);
+        dateFilter.uploaded_at.lte = endDateTime;
+      }
+    }
+
+    // Gabungkan dengan query parameters yang sudah ada
+    const queryParams = {
+      ...req.query,
+      where: {
+        ...dateFilter,
+        ...req.query.where,
+      },
+    };
+
+    const result = await documentService.getAllDocuments(queryParams);
 
     let filtered = result.data;
 
@@ -39,6 +72,7 @@ exports.getAllDocuments = async (req, res) => {
       is_active: doc.is_active,
       username_upload: doc.uploader?.username,
       categories: doc.kategori.map((c) => ({ id: c.id, name: c.name })),
+      reports: doc.reports || [], 
     }));
 
     return successList(res, "Success getting all documents", {
@@ -80,6 +114,7 @@ exports.getDocumentById = async (req, res) => {
       is_active: doc.is_active,
       username_upload: doc.uploader?.username,
       categories: doc.kategori.map((c) => ({ id: c.id, name: c.name })),
+      reports: doc.reports || [], 
     };
 
     return successList(res, "Success getting document by id", [formatted]);

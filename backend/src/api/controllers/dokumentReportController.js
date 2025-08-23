@@ -11,8 +11,12 @@ const {
 
 exports.getAllReports = async (req, res) => {
   try {
+    const { startDate, endDate, ...otherParams } = req.query;
+    
     const result = await documentReportService.getAllReports({
-      ...req.query,
+      ...otherParams,
+      startDate,
+      endDate,
       user: req.user, // ← kirim user dari middleware auth
     });
 

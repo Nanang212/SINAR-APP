@@ -12,6 +12,8 @@ exports.findAllReports = async (params) => {
     search = "",
     where = {},
     user, // ← user dari req.user
+    startDate,
+    endDate,
   } = params;
 
   const take = parseInt(limit, 10);
@@ -28,6 +30,31 @@ exports.findAllReports = async (params) => {
         kategori: {
           some: { id: user.category_id },
         },
+      },
+    };
+  }
+
+  // 📅 Date range filtering based on document uploaded_at
+  if (startDate || endDate) {
+    let dateFilter = {};
+    
+    if (startDate) {
+      const startDateTime = new Date(startDate);
+      startDateTime.setHours(0, 0, 0, 0);
+      dateFilter.gte = startDateTime;
+    }
+
+    if (endDate) {
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      dateFilter.lte = endDateTime;
+    }
+
+    whereClause = {
+      ...whereClause,
+      document: {
+        ...whereClause.document,
+        uploaded_at: dateFilter,
       },
     };
   }
@@ -80,6 +107,9 @@ exports.findAllReports = async (params) => {
           id: true,
           original_name: true,
           url: true,
+          uploaded_at: true,
+          title: true,
+          remark: true,
         },
       },
       user: {
@@ -134,6 +164,9 @@ exports.findAllReports = async (params) => {
           id: report.document.id,
           original_name: report.document.original_name,
           url: `${baseUrl}/api/v1/documents/download/${report.document.id}`,
+          uploaded_at: report.document.uploaded_at,
+          title: report.document.title,
+          remark: report.document.remark,
         },
         reports: {
           TEXT: [],
@@ -190,6 +223,43 @@ exports.findAllReports = async (params) => {
   };
 };
 
+// Method khusus untuk filter tanggal berdasarkan document uploaded_at
+exports.findReportsByDateRange = async (
+  startDate,
+  endDate,
+  otherParams = {}
+) => {
+  let dateFilter = {};
+
+  if (startDate || endDate) {
+    let documentDateFilter = {};
+
+    if (startDate) {
+      const startDateTime = new Date(startDate);
+      startDateTime.setHours(0, 0, 0, 0);
+      documentDateFilter.gte = startDateTime;
+    }
+
+    if (endDate) {
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      documentDateFilter.lte = endDateTime;
+    }
+
+    dateFilter.document = {
+      uploaded_at: documentDateFilter,
+    };
+  }
+
+  return await exports.findAllReports({
+    ...otherParams,
+    where: {
+      ...dateFilter,
+      ...otherParams?.where,
+    },
+  });
+};
+
 exports.findReportById = async (id) => {
   const report = await prisma.documentReport.findFirst({
     where: { id },
@@ -210,6 +280,9 @@ exports.findReportById = async (id) => {
           id: true,
           original_name: true,
           url: true,
+          uploaded_at: true,
+          title: true,
+          remark: true,
           kategori: {
             select: {
               id: true,
@@ -291,6 +364,9 @@ exports.createReport = async ({ data, createdBy }) => {
             id: true,
             original_name: true,
             url: true,
+            uploaded_at: true,
+            title: true,
+            remark: true,
           },
         },
         user: {
@@ -366,6 +442,9 @@ exports.updateReport = async (id, data, updatedBy) => {
             id: true,
             original_name: true,
             url: true,
+            uploaded_at: true,
+            title: true,
+            remark: true,
           },
         },
         user: {

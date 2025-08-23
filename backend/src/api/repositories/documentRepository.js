@@ -37,8 +37,114 @@ exports.findAllDocuments = async (params) => {
           name: true,
         },
       },
+      reports: {
+        select: {
+          id: true,
+          type: true,
+          content: true,
+          original_name: true,
+          description: true,
+          is_downloaded: true,
+          downloaded_at: true,
+          created_at: true,
+          updated_at: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: {
+          updated_at: 'desc',
+        },
+      },
     },
-    searchFields: ['title', 'original_name'],
+    searchFields: ["title", "original_name"],
+  });
+};
+
+// Jika ingin method khusus untuk filter tanggal
+exports.findDocumentsByDateRange = async (
+  startDate,
+  endDate,
+  otherParams = {}
+) => {
+  let dateFilter = {};
+
+  if (startDate || endDate) {
+    dateFilter.uploaded_at = {};
+
+    if (startDate) {
+      const startDateTime = new Date(startDate);
+      startDateTime.setHours(0, 0, 0, 0);
+      dateFilter.uploaded_at.gte = startDateTime;
+    }
+
+    if (endDate) {
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      dateFilter.uploaded_at.lte = endDateTime;
+    }
+  }
+
+  return await findAllBuilder({
+    model: prisma.document,
+    params: {
+      ...otherParams,
+      where: {
+        is_active: true,
+        ...dateFilter,
+        ...otherParams?.where,
+      },
+    },
+    customSelect: {
+      id: true,
+      title: true,
+      filename: true,
+      original_name: true,
+      url: true,
+      uploaded_at: true,
+      is_downloaded: true,
+      is_active: true,
+      remark: true,
+      createdBy: true,
+      updatedBy: true,
+      uploader: {
+        select: {
+          username: true,
+        },
+      },
+      kategori: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      reports: {
+        select: {
+          id: true,
+          type: true,
+          content: true,
+          original_name: true,
+          description: true,
+          is_downloaded: true,
+          downloaded_at: true,
+          created_at: true,
+          updated_at: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: {
+          updated_at: 'desc',
+        },
+      },
+    },
+    searchFields: ["title", "original_name"],
   });
 };
 
@@ -68,6 +174,28 @@ exports.findDocumentById = async (id) => {
         select: {
           id: true,
           name: true,
+        },
+      },
+      reports: {
+        select: {
+          id: true,
+          type: true,
+          content: true,
+          original_name: true,
+          description: true,
+          is_downloaded: true,
+          downloaded_at: true,
+          created_at: true,
+          updated_at: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: {
+          updated_at: 'desc',
         },
       },
     },
