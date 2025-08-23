@@ -7,27 +7,27 @@
   } from "@/lib/services/users/user.service";
   import ConfirmationModal from '@/lib/components/ui/ConfirmationModal.svelte';
   import { modalToastStore } from '@/lib/stores/modal-toast';
-  import Loading from '$lib/components/ui/loading.svelte';
 
   interface User {
     id: string;
     username: string;
-    name_mentri: string | null;
     contact_person: string | null;
-    logo_url: string | null;
-    role: string;
-    category_name: string | null;
-    is_active: boolean;
+    name_mentri: string | null;
+    category?: {
+      id: number;
+      name: string;
+    } | null;
+    role?: {
+      id: number;
+      name: string;
+    } | null;
     created_at: string;
-    updated_at: string;
-    statusColor: string;
-    roleColor: string;
+    iconColor: string;
   }
 
   interface $$Props {
     fetchOnMount?: boolean;
     onDelete?: (user: User) => void;
-    onRefresh?: () => void;
     onRowClick?: (user: ApiUser) => void;
     searchTerm?: string;
     sortOrder?: 'asc' | 'desc';
@@ -36,7 +36,6 @@
   let {
     fetchOnMount = false,
     onDelete,
-    onRefresh,
     onRowClick,
     searchTerm = "",
     sortOrder = 'desc',
@@ -60,53 +59,48 @@
       return {
         id: apiUser.id.toString(),
         username: apiUser.username || "Unknown",
-        name_mentri: apiUser.name_mentri || null,
         contact_person: apiUser.contact_person || null,
-        logo_url: apiUser.logo_url || null,
-        role: apiUser.role?.name || "user",
-        category_name: apiUser.category?.name || null,
-        is_active: apiUser.is_active ?? true,
+        name_mentri: apiUser.name_mentri || null,
+        category: apiUser.category || null,
+        role: apiUser.role || null,
         created_at: apiUser.created_at,
-        updated_at: apiUser.updated_at,
-        statusColor: getStatusColor(apiUser.is_active ?? true),
-        roleColor: getRoleColor(apiUser.role?.name || "user"),
+        iconColor: getIconColorForUser(apiUser.username),
       };
     } catch (error) {
       console.error("Error transforming user:", error, apiUser);
       return {
         id: apiUser.id?.toString() || "unknown",
         username: "Error loading user",
-        name_mentri: null,
         contact_person: null,
-        logo_url: null,
-        role: "user",
-        category_name: null,
-        is_active: false,
+        name_mentri: null,
+        category: null,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        statusColor: "text-gray-500",
-        roleColor: "text-gray-500",
+        iconColor: "text-gray-500",
       };
     }
   }
 
-  // Get status color based on active status
-  function getStatusColor(isActive: boolean): string {
-    return isActive ? "text-green-500" : "text-red-500";
-  }
-
-  // Get role color based on role
-  function getRoleColor(role: string): string {
-    switch (role.toLowerCase()) {
-      case "admin":
-        return "text-purple-500";
-      case "manager":
-        return "text-blue-500";
-      case "user":
-        return "text-gray-500";
-      default:
-        return "text-gray-500";
-    }
+  // Get icon color based on username
+  function getIconColorForUser(username: string | undefined): string {
+    const colors = [
+      "text-blue-500",
+      "text-green-500", 
+      "text-purple-500",
+      "text-pink-500",
+      "text-yellow-500",
+      "text-indigo-500",
+      "text-red-500",
+      "text-orange-500"
+    ];
+    
+    // Generate consistent color based on username
+    const safeUsername = username || "default";
+    const hash = safeUsername.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    
+    return colors[Math.abs(hash) % colors.length];
   }
 
   // Fetch users with server-side pagination
@@ -134,48 +128,48 @@
       console.log("API Response:", response);
 
       if (response.status === true && response.data) {
-        console.log("Full response structure:", response);
-        console.log("response.data is array?", Array.isArray(response.data));
-        console.log("response.data.data exists?", !!response.data?.data);
-        console.log("response.total:", response.total);
+        console.log("🔍 RESPONSE ANALYSIS:");
+        console.log("- Full response structure:", response);
+        console.log("- response.data is array?", Array.isArray(response.data));
+        console.log("- response.data.data exists?", !!response.data?.data);
+        console.log("- response.total:", response.total);
+        console.log("- current pageSize:", pageSize);
         
         // Handle both direct array and nested object response structures (like DocumentTable)
         let usersData: ApiUser[] = [];
         let total = 0;
         
         if (Array.isArray(response.data)) {
-          // Direct array response
+          console.log("📊 Using DIRECT ARRAY response");
           usersData = response.data;
           total = response.total || response.data.length;
+          totalPages = Math.ceil(total / pageSize);
+          console.log("- usersData.length:", usersData.length);
+          console.log("- total assigned:", total);
+          console.log("- totalPages calculated:", totalPages);
         } else if (response.data.data && Array.isArray(response.data.data)) {
-          // Nested object response  
+          console.log("📊 Using NESTED OBJECT response");
           usersData = response.data.data;
           total = response.data.total || 0;
           totalPages = Math.ceil(total / pageSize);
+          console.log("- usersData.length:", usersData.length);
+          console.log("- total assigned:", total);
+          console.log("- totalPages calculated:", totalPages);
+        } else {
+          console.log("❌ UNKNOWN response structure!");
         }
-        
-        const page = response.page || 1;
-        const limit = 10; // Our pageSize
 
-        // Calculate totalPages based on total records and pageSize
-        totalPages = Math.ceil(total / pageSize);
-
-        console.log("✅ FIXED: Processing", usersData.length, "users");
-        console.log("✅ Pagination: total:", total, "page:", page, "limit:", limit);
-        console.log("✅ First user sample:", usersData[0]);
-        console.log("✅ Setting totalRecords to:", total);
-        
+        console.log("Processing", usersData.length, "users...");
         apiUsers = usersData;
         users = usersData.map(transformApiUser);
         totalRecords = total;
         
-        console.log("✅ After assignment:");
-        console.log("- apiUsers.length:", apiUsers.length);
-        console.log("- users.length:", users.length); 
+        console.log("🧮 Pagination calculation:");
         console.log("- totalRecords:", totalRecords);
-        console.log("- totalPages:", totalPages);
+        console.log("- pageSize:", pageSize);
+        console.log("- totalPages calculated:", totalPages);
         console.log("- currentPage:", currentPage);
-        console.log("- Should next be enabled?", currentPage < totalPages);
+        console.log("- Math.ceil(totalRecords / pageSize):", Math.ceil(totalRecords / pageSize));
         error = null;
       } else {
         error = response.message || "Failed to fetch users";
@@ -191,18 +185,16 @@
       apiUsers = [];
       totalRecords = 0;
       totalPages = 0;
-      console.error("Fetch Error:", err);
+      console.error("❌ Fetch Error:", err);
+      console.error("❌ Error details:", JSON.stringify(err, null, 2));
     } finally {
       isLoading = false;
-      console.log("fetchUsers completed, isLoading:", isLoading);
+      console.log("✅ fetchUsers completed, isLoading:", isLoading);
+      console.log("✅ Final users count:", users.length);
+      console.log("✅ Final error state:", error);
     }
   }
 
-  // Handle refresh
-  async function handleRefresh() {
-    await fetchUsers();
-    onRefresh?.();
-  }
 
   // Fetch on mount if required
   onMount(() => {
@@ -218,45 +210,11 @@
 
   // Public method to set search and sort parameters (called from parent)
   export function setSearchParams(term: string, order: 'asc' | 'desc') {
-    console.log('📊 UserTable.setSearchParams ENTRY - received:', { term, order });
-    console.log('- Previous values:', { searchTerm, sortOrder });
     searchTerm = term;
     sortOrder = order;
-    console.log('- New values after assignment:', { searchTerm, sortOrder });
     currentPage = 1; // Reset to first page when searching
-    console.log('📊 UserTable.setSearchParams calling fetchUsers directly');
     fetchUsers();
-    console.log('📊 UserTable.setSearchParams EXIT');
   }
-
-  // Watch for changes in searchTerm and sortOrder to trigger refetch
-  let prevSearchTerm = searchTerm;
-  let prevSortOrder = sortOrder;
-  
-  $effect(() => {
-    console.log("🔄 UserTable $effect triggered:");
-    console.log("- prevSearchTerm:", prevSearchTerm, "→ searchTerm:", searchTerm);
-    console.log("- prevSortOrder:", prevSortOrder, "→ sortOrder:", sortOrder);
-    
-    // Only trigger if search term or sort order actually changed
-    if (prevSearchTerm !== searchTerm || prevSortOrder !== sortOrder) {
-      console.log("🎯 Search/Sort changed, triggering debounced fetchUsers");
-      prevSearchTerm = searchTerm;
-      prevSortOrder = sortOrder;
-      
-      // Debounce search to avoid too many requests
-      const timeoutId = setTimeout(() => {
-        console.log("⏰ Debounced timeout fired - calling fetchUsers");
-        currentPage = 1; // Reset to first page when searching
-        fetchUsers();
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    }
-    
-    // Return undefined if no cleanup needed
-    return undefined;
-  });
 
   // Modal state
   let showDeleteModal = $state(false);
@@ -280,7 +238,7 @@
 
     isDeleting = true;
     try {
-      const response = await userService.deleteUser(userToDelete.id);
+      const response = await userService.deleteUser(parseInt(userToDelete.id));
       
       if (response.status) {
         modalToastStore.success('User deleted successfully!');
@@ -322,6 +280,12 @@
       onRowClick(apiUser);
     }
   }
+
+
+
+
+
+
 
   function formatDate(dateStr: string) {
     const date = new Date(dateStr);
@@ -366,27 +330,27 @@
           <thead class="bg-gray-50 sticky top-12 sm:-top-1 z-10">
             <tr>
               <!-- User Column -->
-              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[280px] sm:min-w-[220px]">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[250px] sm:min-w-[200px]">
                 User
               </th>
-              <!-- Role Column (Hidden on mobile) -->
-              <th class="hidden md:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[120px] sm:min-w-[100px]">
-                Role
-              </th>
-              <!-- Category Column (Hidden on small screens) -->
-              <th class="hidden lg:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[130px]">
+              <!-- Category Column (Hidden on mobile) -->
+              <th class="hidden md:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[120px]">
                 Category
               </th>
+              <!-- Role Column (Hidden on small screens) -->
+              <th class="hidden lg:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[100px] sm:min-w-[80px]">
+                Role
+              </th>
               <!-- Contact Person Column (Hidden on small screens) -->
-              <th class="hidden sm:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[140px] sm:min-w-[120px]">
+              <th class="hidden xl:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[130px] sm:min-w-[100px]">
                 Contact Person
               </th>
-              <!-- Created At Column (Hidden on small screens) -->
+              <!-- Created Date Column (Hidden on small screens) -->
               <th class="hidden sm:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]">
-                Created At
+                Created Date
               </th>
               <!-- Actions Column -->
-              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[100px] sm:min-w-[80px]">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[130px] sm:min-w-[90px]">
                 Actions
               </th>
             </tr>
@@ -397,91 +361,37 @@
                 <!-- User Cell -->
                 <td class="px-3 sm:px-6 py-4 border-r border-gray-200">
                   <div class="flex items-center">
-                    <!-- User Avatar/Logo -->
-                    <div class="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-3">
-                      {#if user.logo_url}
-                        <img 
-                          src={user.logo_url} 
-                          alt="Profile" 
-                          class="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover border-2 border-gray-200 shadow-sm"
-                          onerror={(e) => {
-                            // Fallback to icon if image fails to load
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling.style.display = 'flex';
-                          }}
-                        />
-                        <!-- Fallback icon -->
-                        <div class="hidden h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gray-300 items-center justify-center">
-                          <svg class="h-4 w-4 sm:h-6 sm:w-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
-                          </svg>
-                        </div>
-                      {:else}
-                        <div class="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                          <svg class="h-4 w-4 sm:h-6 sm:w-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
-                          </svg>
-                        </div>
-                      {/if}
-                    </div>
+                    <svg class="h-6 w-6 sm:h-8 sm:w-8 {user.iconColor} mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                    </svg>
                     <div class="min-w-0 flex-1">
                       <div class="text-sm font-medium text-gray-900 truncate" title={user.username}>
-                        {user.username.length > 30 ? user.username.substring(0, 30) + '...' : user.username}
+                        {user.username}
                       </div>
-                      {#if user.name_mentri}
-                        <div class="text-xs text-gray-500 truncate" title={user.name_mentri}>
-                          {user.name_mentri.length > 35 ? user.name_mentri.substring(0, 35) + '...' : user.name_mentri}
-                        </div>
-                      {/if}
-                      {#if user.contact_person}
-                        <div class="text-xs text-gray-400 truncate" title={user.contact_person}>
-                          📞 {user.contact_person.length > 25 ? user.contact_person.substring(0, 25) + '...' : user.contact_person}
-                        </div>
-                      {/if}
-                      <!-- Mobile: Show role and category -->
-                      <div class="md:hidden text-xs text-gray-400 mt-1 space-x-2">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 {user.roleColor}">
-                          {user.role}
-                        </span>
-                        {#if user.category_name}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                            {user.category_name}
-                          </span>
-                        {/if}
+                      <!-- Mobile: Show category and date info -->
+                      <div class="md:hidden text-xs text-gray-400 mt-1">
+                        {user.category?.name || 'No category'} • {formatDate(user.created_at).split(' ')[0]}
                       </div>
                     </div>
                   </div>
                 </td>
-                <!-- Role Cell (Desktop only) -->
+                <!-- Category Cell (Desktop only) -->
                 <td class="hidden md:table-cell px-6 py-4 whitespace-nowrap border-r border-gray-200">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 {user.roleColor}">
-                    {user.role}
+                  <div class="text-sm text-gray-900">{user.category?.name || 'No category'}</div>
+                </td>
+                <!-- Role Cell (Large screens only) -->
+                <td class="hidden lg:table-cell px-6 py-4 whitespace-nowrap border-r border-gray-200">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {user.role?.name === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}">
+                    {user.role?.name || 'user'}
                   </span>
                 </td>
-                <!-- Category Cell (Large screens only) -->
-                <td class="hidden lg:table-cell px-6 py-4 whitespace-nowrap border-r border-gray-200">
-                  {#if user.category_name}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {user.category_name}
-                    </span>
-                  {:else}
-                    <span class="text-gray-400 text-sm">No Category</span>
-                  {/if}
+                <!-- Contact Person Cell (XL screens only) -->
+                <td class="hidden xl:table-cell px-6 py-4 whitespace-nowrap border-r border-gray-200">
+                  <span class="text-sm text-gray-900">
+                    {user.contact_person || '-'}
+                  </span>
                 </td>
-                <!-- Contact Person Cell (Small screens and up) -->
-                <td class="hidden sm:table-cell px-3 sm:px-6 py-4 whitespace-nowrap border-r border-gray-200">
-                  {#if user.contact_person}
-                    <div class="text-sm text-gray-900 flex items-center">
-                      <svg class="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                      {user.contact_person}
-                    </div>
-                  {:else}
-                    <span class="text-gray-400 text-sm">No Contact</span>
-                  {/if}
-                </td>
-                <!-- Created At Cell (Small screens and up) -->
+                <!-- Created Date Cell (Small screens and up) -->
                 <td class="hidden sm:table-cell px-3 sm:px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
                   <div class="sm:whitespace-nowrap">
                     <div class="font-medium">{formatDate(user.created_at).split(' ')[0]}</div>
@@ -490,7 +400,26 @@
                 </td>
                 <!-- Actions Cell -->
                 <td class="px-3 sm:px-6 py-4 text-sm font-medium">
-                  <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
+                  <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
+                    <!-- Edit Button -->
+                    <div class="relative group">
+                      <button
+                        onclick={() => handleRowClick(user)}
+                        class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                        aria-label="Edit user"
+                      >
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                        Edit
+                      </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="h-6 w-px bg-gray-300"></div>
+
                     <!-- Delete Button -->
                     <div class="relative group">
                       <button class="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors" onclick={() => handleDelete(user)} aria-label="Delete user">
@@ -515,7 +444,7 @@
     {#if users.length === 0}
       <div class="text-center py-12">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         <h3 class="mt-2 text-sm font-medium text-gray-900">No users found</h3>
         <p class="mt-1 text-sm text-gray-500">
@@ -528,22 +457,17 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 pt-4 border-t border-gray-200 bg-white sticky bottom-0 z-10">
       <!-- Results Info -->
       <div class="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
-        <!-- Debug: Let's see what values are being used -->
-        {#if totalRecords === 0}
-          <span class="text-red-500">🚨 DEBUG: totalRecords={totalRecords}, currentPage={currentPage}, pageSize={pageSize}</span>
-        {:else}
-          <span class="hidden sm:inline">Showing </span>
-          <span class="font-medium">{Math.min((currentPage - 1) * pageSize + 1, totalRecords)}</span>
-          <span class="hidden sm:inline"> to </span>
-          <span class="sm:hidden">-</span>
-          <span class="font-medium">{Math.min(currentPage * pageSize, totalRecords)}</span>
-          <span class="hidden sm:inline"> of </span>
-          <span class="sm:hidden">/</span>
-          <span class="font-medium">{totalRecords}</span>
-          <span class="hidden sm:inline"> results</span>
-          {#if searchTerm.trim()}
-            <span class="text-gray-500 block sm:inline"> (filtered)</span>
-          {/if}
+        <span class="hidden sm:inline">Showing </span>
+        <span class="font-medium">{Math.min((currentPage - 1) * pageSize + 1, totalRecords)}</span>
+        <span class="hidden sm:inline"> to </span>
+        <span class="sm:hidden">-</span>
+        <span class="font-medium">{Math.min(currentPage * pageSize, totalRecords)}</span>
+        <span class="hidden sm:inline"> of </span>
+        <span class="sm:hidden">/</span>
+        <span class="font-medium">{totalRecords}</span>
+        <span class="hidden sm:inline"> results</span>
+        {#if searchTerm.trim()}
+          <span class="text-gray-500 block sm:inline"> (filtered)</span>
         {/if}
       </div>
 
@@ -589,7 +513,7 @@
 <ConfirmationModal
   isOpen={showDeleteModal}
   title="Delete User"
-  message={`Are you sure you want to delete user "${userToDelete?.username}"? This action cannot be undone.`}
+  message={`Are you sure you want to delete "${userToDelete?.username}"? This action cannot be undone.`}
   confirmText="Delete"
   cancelText="Cancel"
   confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
@@ -597,3 +521,5 @@
   onCancel={cancelDelete}
   isLoading={isDeleting}
 />
+
+

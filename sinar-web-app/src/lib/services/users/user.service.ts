@@ -117,6 +117,9 @@ class UserService {
           code: response.code,
           message: response.message,
           data: response.data,
+          total: response.total,
+          page: response.page,
+          limit: response.limit,
         };
       }
 

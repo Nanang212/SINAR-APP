@@ -1,4 +1,6 @@
 <script lang="ts">
+  console.log('🚨 USERSTWO UserTabs.svelte loaded!');
+  
   interface $$Props {
     activeTab?: string;
     onTabChange?: (tab: string) => void;
@@ -22,8 +24,8 @@
   }: $$Props = $props();
 
   function setActiveTab(tab: string) {
-    console.log('UserTabs: Setting active tab to:', tab);
-    console.log('UserTabs: onTabChange exists:', !!onTabChange);
+    console.log('DocumentTabs: Setting active tab to:', tab);
+    console.log('DocumentTabs: onTabChange exists:', !!onTabChange);
     onTabChange?.(tab);
   }
 
@@ -37,24 +39,16 @@
 
   function handleSearchInput(event: Event) {
     const target = event.target as HTMLInputElement;
-    console.log("🔍 UserTabs handleSearchInput:", target.value);
-    console.log("- onSearch callback exists?", !!onSearch);
     onSearch?.(target.value);
   }
 
   function handleRefresh() {
-    console.log("🔄 UserTabs handleRefresh called");
-    console.log("- onRefresh callback exists?", !!onRefresh);
     onRefresh?.();
   }
 
   function handleSortToggle() {
     const newOrder = sortOrder === 'desc' ? 'asc' : 'desc';
-    console.log("🔀 UserTabs handleSortToggle BEFORE:", sortOrder, "→", newOrder);
-    console.log("- onSortChange callback exists?", !!onSortChange);
-    console.log("- About to call onSortChange with:", newOrder);
     onSortChange?.(newOrder);
-    console.log("🔀 UserTabs handleSortToggle AFTER calling onSortChange");
   }
 </script>
 
@@ -85,7 +79,7 @@
     >
       <div class="flex items-center space-x-1 sm:space-x-2">
         <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
         </svg>
         <span class="text-sm sm:text-base">Browse</span>
       </div>
@@ -143,7 +137,7 @@
             onclick={handleRefresh}
             disabled={isLoading}
             class="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 focus:from-cyan-600 focus:to-sky-700 border border-cyan-500 rounded-md shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-400 transition-all duration-200 flex items-center gap-1.5"
-            aria-label="Refresh users"
+            aria-label="Refresh documents"
           >
             <svg
               class="w-4 h-4 {isLoading ? 'animate-spin' : ''}"
@@ -228,7 +222,7 @@
           onclick={handleRefresh}
           disabled={isLoading}
           class="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 focus:from-cyan-600 focus:to-sky-700 border border-cyan-500 rounded-md shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-400 transition-all duration-200"
-          aria-label="Refresh users"
+          aria-label="Refresh documents"
         >
           <svg
             class="w-4 h-4 {isLoading ? 'animate-spin' : ''}"
@@ -247,7 +241,7 @@
         
         <!-- Tooltip -->
         <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-          {isLoading ? 'Refreshing...' : 'Refresh users'}
+          {isLoading ? 'Refreshing...' : 'Refresh documents'}
           <!-- Tooltip arrow -->
           <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
         </div>
