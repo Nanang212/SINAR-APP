@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { authService, type ChangePasswordRequest } from "$lib/services";
+  import { onMount, onDestroy } from "svelte";
+  import { authService, userService, type ChangePasswordRequest } from "$lib/services";
   import { NavigationHelper } from "$lib/utils";
   import { Loading, toastStore, ConfirmationModal } from "$lib";
   import { modalToastStore } from "$lib/stores/modal-toast";
@@ -31,37 +31,54 @@
       const currentUser = authService.getCurrentUser();
       if (currentUser) {
         try {
-          const response = await authService.getUserById(currentUser.id);
+          // Use userService instead of authService to get full user data including logo_url
+          const response = await userService.getUserById(currentUser.id);
           if (response.status && response.data) {
             userName = response.data.username;
             userInitial = response.data.username.charAt(0).toUpperCase();
-            userLogo = response.data.logo || null;
             
             // Debug: Log user data to check structure
-            console.log('User data from API:', response.data);
+            console.log('User data from userService API:', response.data);
             
             // Try multiple ways to get role_id
             userRoleId = response.data.role_id || 
                         response.data.role?.id || 
-                        response.data.roleId ||
                         null;
             
             console.log('Extracted userRoleId:', userRoleId);
-            console.log('User logo:', userLogo);
+            
+            // Load profile photo if logo_url exists
+            if (response.data.logo_url && response.data.id) {
+              console.log('Loading profile photo for user ID:', response.data.id);
+              try {
+                const photoUrl = await userService.getUserProfilePhotoUrl(response.data.id);
+                if (photoUrl) {
+                  userLogo = photoUrl;
+                  console.log('Profile photo loaded successfully');
+                } else {
+                  console.log('No profile photo available');
+                  userLogo = null;
+                }
+              } catch (photoError) {
+                console.error('Failed to load profile photo:', photoError);
+                userLogo = null;
+              }
+            } else {
+              console.log('No logo_url found in user data');
+              userLogo = null;
+            }
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
           // Fallback to localStorage data
           userName = currentUser.username;
           userInitial = currentUser.username.charAt(0).toUpperCase();
+          userLogo = null;
           
           console.log('Current user from localStorage:', currentUser);
           
-          userRoleId = currentUser.role_id || 
-                      currentUser.role?.id || 
-                      currentUser.roleId ||
-                      currentUser.role ||
-                      null;
+          // For fallback, try to get role from localStorage string or default to null
+          userRoleId = typeof currentUser.role === 'string' ? null : null;
           
           console.log('Fallback userRoleId:', userRoleId);
         }
@@ -86,6 +103,11 @@
     return () => {
       clearInterval(interval);
       document.removeEventListener("click", handleClickOutside);
+      
+      // Clean up blob URL
+      if (userLogo && userLogo.startsWith('blob:')) {
+        userService.revokeProfilePhotoUrl(userLogo);
+      }
     };
   });
 
@@ -171,7 +193,7 @@
         // Auto logout after password change
         setTimeout(async () => {
           try {
-            const logoutResponse = await authService.logout();
+            await authService.logout();
             NavigationHelper.navigateTo("/login");
           } catch (error) {
             console.error("Auto logout error:", error);
@@ -254,26 +276,30 @@
           <!-- User Avatar Button -->
           <button
             onclick={toggleProfileDropdown}
-            class="w-8 h-8 rounded-full flex items-center justify-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 {userLogo ? '' : 'bg-blue-500 hover:bg-blue-600'}"
+            class="w-12 h-12 rounded-full flex items-center justify-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 {userLogo ? '' : 'bg-blue-500 hover:bg-blue-600'}"
             title="Profile menu"
           >
             {#if userLogo}
               <img 
                 src={userLogo} 
                 alt="Profile" 
-                class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
+                class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
                 onerror={(e) => {
                   // Fallback to initial if image fails to load
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                  const img = e.currentTarget as HTMLImageElement;
+                  const fallback = img.nextElementSibling as HTMLElement;
+                  img.style.display = 'none';
+                  if (fallback) {
+                    fallback.style.display = 'flex';
+                  }
                 }}
               />
               <!-- Fallback initial (hidden by default) -->
-              <span class="hidden w-8 h-8 bg-blue-500 rounded-full items-center justify-center text-white text-sm font-medium">
+              <span class="hidden w-12 h-12 bg-blue-500 rounded-full items-center justify-center text-white text-base font-medium">
                 {userInitial}
               </span>
             {:else}
-              <span class="text-white text-sm font-medium">{userInitial}</span>
+              <span class="text-white text-base font-medium">{userInitial}</span>
             {/if}
           </button>
 
@@ -291,7 +317,7 @@
 
                 <!-- Profile Actions -->
                 <!-- Change Password - Only for Admin (role_id = 1) -->
-                {#if userRoleId === 1 || userRoleId === "1" || (userRoleId === null && userName.toLowerCase().includes('admin'))}
+                {#if userRoleId === 1 || (userRoleId === null && userName.toLowerCase().includes('admin'))}
                   <button
                     onclick={openChangePasswordModal}
                     class="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
@@ -373,6 +399,7 @@
         <button
           onclick={closeChangePasswordModal}
           class="text-gray-400 hover:text-gray-600"
+          aria-label="Close modal"
         >
           <svg
             class="w-6 h-6"

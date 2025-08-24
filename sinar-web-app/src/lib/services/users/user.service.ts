@@ -184,7 +184,7 @@ class UserService {
   async getUserById(id: string | number): Promise<ApiResponse<User>> {
     try {
       const response = await httpClient.authenticatedRequest<UsersResponse>(
-        `${this.adminBaseEndpoint}/${id}`
+        `${this.baseEndpoint}/${id}`
       );
 
       console.log('User service - getById raw response:', response);
