@@ -14,8 +14,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 exports.getAllDocuments = async (req, res) => {
   try {
-    // Ambil parameter filter tanggal dari query
-    const { start_date, end_date } = req.query;
+    // Ambil parameter filter tanggal dan is_report dari query
+    const { start_date, end_date, is_report } = req.query;
 
     // Buat where condition untuk filter tanggal
     let dateFilter = {};
@@ -38,11 +38,19 @@ exports.getAllDocuments = async (req, res) => {
       }
     }
 
+    // Buat filter untuk is_report
+    let reportFilter = {};
+    if (is_report !== undefined && is_report !== '') {
+      const hasReport = is_report === 'true';
+      reportFilter.is_report = hasReport;
+    }
+
     // Gabungkan dengan query parameters yang sudah ada
     const queryParams = {
       ...req.query,
       where: {
         ...dateFilter,
+        ...reportFilter,
         ...req.query.where,
       },
     };
@@ -65,6 +73,7 @@ exports.getAllDocuments = async (req, res) => {
       original_name: doc.original_name,
       url: `${baseUrl}/api/v1/documents/download/${doc.id}`,
       is_downloaded: doc.is_downloaded,
+      is_report: doc.is_report,
       uploaded_by: doc.uploaded_by,
       uploaded_at: doc.uploaded_at,
       createdBy: doc.createdBy,
@@ -107,6 +116,7 @@ exports.getDocumentById = async (req, res) => {
       original_name: doc.original_name,
       url: `${baseUrl}/api/v1/documents/download/${doc.id}`,
       is_downloaded: doc.is_downloaded,
+      is_report: doc.is_report,
       uploaded_by: doc.uploader,
       uploaded_at: doc.uploaded_at,
       createdBy: doc.createdBy,

@@ -62,6 +62,7 @@ model Document {
   updatedBy     String           @default("system")
   original_name String
   is_downloaded Boolean          @default(false)
+  is_report     Boolean          @default(false)
   title         String?
   remark        String?
   uploader      User             @relation("UploadedDocuments", fields: [uploaded_by], references: [id])

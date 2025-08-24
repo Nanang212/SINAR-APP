@@ -11,8 +11,16 @@ exports.getAllReports = async (params) => {
 };
 
 // ✅ Get reports by date range
-exports.getReportsByDateRange = async (startDate, endDate, otherParams = {}) => {
-  return await documentReportRepository.findReportsByDateRange(startDate, endDate, otherParams);
+exports.getReportsByDateRange = async (
+  startDate,
+  endDate,
+  otherParams = {}
+) => {
+  return await documentReportRepository.findReportsByDateRange(
+    startDate,
+    endDate,
+    otherParams
+  );
 };
 
 // 🔍 Get single report by ID
@@ -39,7 +47,7 @@ exports.createReport = async ({ data, user }) => {
   // 3. Cek akses kategori
   const isAdmin = user.role?.toLowerCase() === "admin";
   const hasAccess = doc.kategori?.some((cat) => cat.id === user.category_id);
-  
+
   if (!isAdmin && !hasAccess) {
     throw {
       code: 403,
@@ -57,7 +65,7 @@ exports.createReport = async ({ data, user }) => {
   }
 
   // 5. Simpan ke DB
-  return await documentReportRepository.createReport({
+  const result = await documentReportRepository.createReport({
     data: {
       ...data,
       document_id: +data.document_id,
@@ -65,6 +73,15 @@ exports.createReport = async ({ data, user }) => {
     },
     createdBy: user.id,
   });
+
+  // 6. Update is_report menjadi true di document
+  if (result.success) {
+    console.log("✅ CreateReport sukses, updating is_report for document:", data.document_id);
+    const updateRes = await documentRepository.markDocumentHasReport(+data.document_id, user.id);
+    console.log("🔄 markDocumentHasReport result:", updateRes);
+  }
+
+  return result;
 };
 
 // ✏️ Update existing report (support re-upload media)
@@ -77,7 +94,7 @@ exports.updateReport = async (id, data, user) => {
   const doc = existing.document;
   const isAdmin = user.role?.toLowerCase() === "admin";
   const hasAccess = doc?.kategori?.some((cat) => cat.id === user.category_id);
-  
+
   if (!doc || (!isAdmin && !hasAccess)) {
     throw {
       code: 403,
@@ -97,10 +114,11 @@ exports.updateReport = async (id, data, user) => {
   // 1. Ada file media baru (AUDIO/VIDEO) yang mengganti file lama
   // 2. Type berubah dari AUDIO/VIDEO ke TEXT/LINK
   const isUploadingNewMedia = data.content && data.original_name;
-  const isChangingFromMediaToText = data.type && 
-    ["TEXT", "LINK"].includes(data.type) && 
+  const isChangingFromMediaToText =
+    data.type &&
+    ["TEXT", "LINK"].includes(data.type) &&
     ["AUDIO", "VIDEO"].includes(existing.type);
-  
+
   if (existing.content && ["AUDIO", "VIDEO"].includes(existing.type)) {
     if (isUploadingNewMedia || isChangingFromMediaToText) {
       await deleteReportMedia(existing.content);
@@ -133,7 +151,7 @@ exports.deleteReport = async (id) => {
       await deleteReportMedia(existing.content);
     }
   }
-  
+
   return await documentReportRepository.deleteReport(id);
 };
 
@@ -147,7 +165,7 @@ exports.downloadReportMedia = async ({ reportId, user }) => {
   const doc = report.document;
   const isAdmin = user.role?.toLowerCase() === "admin";
   const hasAccess = doc?.kategori?.some((cat) => cat.id === user.category_id);
-  
+
   if (!doc || (!isAdmin && !hasAccess)) {
     throw {
       code: 403,

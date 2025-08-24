@@ -22,6 +22,7 @@ exports.findAllDocuments = async (params) => {
       url: true,
       uploaded_at: true,
       is_downloaded: true,
+      is_report: true,
       is_active: true,
       remark: true,
       createdBy: true,
@@ -106,6 +107,7 @@ exports.findDocumentsByDateRange = async (
       url: true,
       uploaded_at: true,
       is_downloaded: true,
+      is_report: true,
       is_active: true,
       remark: true,
       createdBy: true,
@@ -162,6 +164,7 @@ exports.findDocumentById = async (id) => {
       url: true,
       uploaded_at: true,
       is_downloaded: true,
+      is_report: true,
       remark: true,
       createdBy: true,
       updatedBy: true,
@@ -357,6 +360,27 @@ exports.deleteDocument = async (id, updatedBy) => {
     };
   } catch (error) {
     console.error("Error in deleteDocument:", error);
+    return { success: false, code: 500, msg: "Internal server error" };
+  }
+};
+
+exports.markDocumentHasReport = async (id, updatedBy) => {
+  try {
+    const updated = await prisma.document.update({
+      where: { id },
+      data: {
+        is_report: true,
+        updatedBy: String(updatedBy) || "system",
+      },
+    });
+
+    return {
+      success: true,
+      message: "Document marked as having report",
+      data: updated,
+    };
+  } catch (error) {
+    console.error("Error in markDocumentHasReport:", error);
     return { success: false, code: 500, msg: "Internal server error" };
   }
 };
