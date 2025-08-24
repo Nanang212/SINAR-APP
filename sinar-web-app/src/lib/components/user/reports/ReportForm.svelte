@@ -1470,6 +1470,62 @@
         {/if}
       </div>
 
+      <!-- Document Information (Auto-filled from selected document) -->
+      
+      <!-- Document Title -->
+      <div>
+        <label for="document-title" class="block text-sm font-medium text-gray-700 mb-2">
+          Document Title
+        </label>
+        {#if selectedDocumentId}
+          {@const selectedDoc = getSelectedDocument()}
+          <input
+            id="document-title"
+            type="text"
+            value={selectedDoc?.title || ''}
+            disabled
+            class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+            placeholder="Document title will appear here when you select a document"
+          />
+        {:else}
+          <input
+            id="document-title"
+            type="text"
+            value=""
+            disabled
+            class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+            placeholder="Document title will appear here when you select a document"
+          />
+        {/if}
+      </div>
+
+      <!-- Document Remark -->
+      <div>
+        <label for="document-remark" class="block text-sm font-medium text-gray-700 mb-2">
+          Remark
+        </label>
+        {#if selectedDocumentId}
+          {@const selectedDoc = getSelectedDocument()}
+          <textarea
+            id="document-remark"
+            rows="3"
+            value={selectedDoc?.remark || ''}
+            disabled
+            class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed resize-none"
+            placeholder="Document remark will appear here when you select a document"
+          ></textarea>
+        {:else}
+          <textarea
+            id="document-remark"
+            rows="3"
+            value=""
+            disabled
+            class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed resize-none"
+            placeholder="Document remark will appear here when you select a document"
+          ></textarea>
+        {/if}
+      </div>
+
       <!-- Description -->
       <div>
         <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
