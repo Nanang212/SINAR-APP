@@ -275,6 +275,23 @@ class AuthService {
     httpClient.clearAuthToken();
     if (typeof window !== "undefined") {
       localStorage.removeItem("user_data");
+      
+      // Clear all profile photo and user data cache
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('profile_photo_') || key.startsWith('user_data_'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Mark session as fresh for next login
+      sessionStorage.removeItem('dashboard_session_fresh');
+      
+      if (keysToRemove.length > 0) {
+        console.log(`AuthService: Cleared ${keysToRemove.length} cached entries during session clear`);
+      }
     }
   }
 }
