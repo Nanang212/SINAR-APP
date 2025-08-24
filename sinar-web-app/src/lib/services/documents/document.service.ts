@@ -41,6 +41,8 @@ export interface PaginationParams {
   search?: string;
   order?: 'asc' | 'desc';
   is_report?: 'true' | 'false';
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface UploadDocumentRequest {
@@ -64,7 +66,7 @@ class DocumentService {
   /**
    * Get all documents
    */
-  async getAllDocuments(params?: { search?: string; order?: 'asc' | 'desc'; is_report?: 'true' | 'false' }): Promise<ApiResponse<Document[]>> {
+  async getAllDocuments(params?: { search?: string; order?: 'asc' | 'desc'; is_report?: 'true' | 'false'; startDate?: string; endDate?: string }): Promise<ApiResponse<Document[]>> {
     try {
       const queryParams = new URLSearchParams();
 
@@ -81,6 +83,14 @@ class DocumentService {
       // Add is_report parameter if provided
       if (params?.is_report && (params.is_report === 'true' || params.is_report === 'false')) {
         queryParams.append('is_report', params.is_report);
+      }
+
+      // Add date range parameters if provided
+      if (params?.startDate && params.startDate.trim() !== '') {
+        queryParams.append('start_date', params.startDate.trim());
+      }
+      if (params?.endDate && params.endDate.trim() !== '') {
+        queryParams.append('end_date', params.endDate.trim());
       }
 
       const fullUrl = queryParams.toString() 
@@ -129,7 +139,7 @@ class DocumentService {
    */
   async getPaginatedDocuments(params: PaginationParams = {}): Promise<ApiResponse<PaginatedDocumentsResponse>> {
     try {
-      const { page = 1, limit = 10, search, order, is_report } = params;
+      const { page = 1, limit = 10, search, order, is_report, startDate, endDate } = params;
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
@@ -150,9 +160,17 @@ class DocumentService {
         queryParams.append('is_report', is_report);
       }
 
+      // Add date range parameters if provided
+      if (startDate && startDate.trim() !== '') {
+        queryParams.append('start_date', startDate.trim());
+      }
+      if (endDate && endDate.trim() !== '') {
+        queryParams.append('end_date', endDate.trim());
+      }
+
       const fullUrl = `${this.baseEndpoint}?${queryParams.toString()}`;
       console.log('🚀 Document Service - Making request to:', fullUrl);
-      console.log('📋 Request parameters:', { page, limit, search, order, is_report });
+      console.log('📋 Request parameters:', { page, limit, search, order, is_report, startDate, endDate });
       
       const response = await httpClient.authenticatedRequest<any>(fullUrl);
 

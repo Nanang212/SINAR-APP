@@ -99,7 +99,7 @@
   }
 
   // Fetch documents with server-side pagination, search and sort
-  async function fetchDocuments(page: number = 1, search: string = '', order: 'asc' | 'desc' = 'desc') {
+  async function fetchDocuments(page: number = 1, search: string = '', order: 'asc' | 'desc' = 'desc', startDate: string | null = null, endDate: string | null = null) {
     console.log(`Starting fetchDocuments with pagination - Page: ${page}, Search: "${search}", Order: ${order}`);
     isLoading = true;
     error = null;
@@ -112,6 +112,8 @@
         limit: pageSize,
         search: search,
         order: order,
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
       };
       
       const response = await documentService.getPaginatedDocuments(params);
@@ -201,6 +203,12 @@
   export function setSearchParams(search: string, order: 'asc' | 'desc') {
     currentPage = 1; // Reset to page 1 when search/sort changes
     fetchDocuments(1, search, order);
+  }
+
+  // Public method to set date range filter (called from parent)
+  export function setDateRange(startDate: string | null, endDate: string | null) {
+    currentPage = 1; // Reset to page 1 when date filter changes
+    fetchDocuments(1, searchTerm, sortOrder, startDate, endDate);
   }
 
   // Table state

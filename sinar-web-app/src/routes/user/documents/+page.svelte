@@ -4,6 +4,7 @@
   import { Loading } from "$lib";
   import { DashboardLayout } from "$lib";
   import { DocumentListTable } from '@/lib/components/user';
+  import DateRangePicker from '$lib/components/ui/DateRangePicker.svelte';
   import { type Document } from '$lib/services';
 
   let hasAccess = $state(false);
@@ -22,6 +23,10 @@
   let searchTerm = $state("");
   let sortOrder = $state<'asc' | 'desc'>('desc'); // Default to newest first (desc by id)
   let isLoading = $state(false);
+  
+  // Date filter state
+  let startDate = $state<string | null>(null);
+  let endDate = $state<string | null>(null);
 
   function handleSearch(term: string) {
     searchTerm = term;
@@ -44,6 +49,14 @@
       documentTableRef.loadDocuments().finally(() => {
         isLoading = false;
       });
+    }
+  }
+
+  function handleDateRangeChange(payload: { startDate: string | null; endDate: string | null }) {
+    startDate = payload.startDate;
+    endDate = payload.endDate;
+    if (documentTableRef) {
+      documentTableRef.setDateRange(startDate, endDate);
     }
   }
 
@@ -125,6 +138,17 @@
                 </div>
               </div>
 
+              <!-- Mobile: Date Range Filter -->
+              <div class="flex sm:hidden items-center gap-2 w-full mt-2">
+                <DateRangePicker
+                  startDate={startDate}
+                  endDate={endDate}
+                  onDateRangeChange={handleDateRangeChange}
+                  className="flex-1"
+                  placeholder="Filter by date"
+                />
+              </div>
+
               <!-- Desktop: Sort Toggle Button -->
               <div class="hidden sm:block relative group">
                 <button
@@ -166,6 +190,17 @@
                   <!-- Tooltip arrow -->
                   <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                 </div>
+              </div>
+
+              <!-- Desktop: Date Range Filter -->
+              <div class="hidden sm:flex items-center gap-2">
+                <DateRangePicker
+                  startDate={startDate}
+                  endDate={endDate}
+                  onDateRangeChange={handleDateRangeChange}
+                  className="w-48"
+                  placeholder="Filter by date"
+                />
               </div>
 
               <!-- Desktop Search Bar -->

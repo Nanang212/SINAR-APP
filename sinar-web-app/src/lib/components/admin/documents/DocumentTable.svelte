@@ -108,17 +108,19 @@
   }
 
   // Fetch documents with server-side pagination
-  async function fetchDocuments() {
+  async function fetchDocuments(page: number = 1, search: string = '', order: 'asc' | 'desc' = 'desc', startDate: string | null = null, endDate: string | null = null) {
     console.log("Starting fetchDocuments with server-side pagination...");
     isLoading = true;
     error = null;
 
     try {
       const params: PaginationParams = {
-        page: currentPage,
+        page: page,
         limit: pageSize,
-        search: searchTerm.trim(),
-        order: sortOrder
+        search: search.trim(),
+        order: order,
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
       };
 
       console.log("Calling documentService.getPaginatedDocuments() with params:", params);
@@ -172,14 +174,14 @@
 
   // Handle refresh
   async function handleRefresh() {
-    await fetchDocuments();
+    await fetchDocuments(currentPage, searchTerm, sortOrder);
     onRefresh?.();
   }
 
   // Fetch on mount if required
   onMount(() => {
     if (fetchOnMount) {
-      fetchDocuments();
+      fetchDocuments(1, searchTerm, sortOrder);
     }
 
     // Add window focus listener to refresh data after download
@@ -187,7 +189,7 @@
       if (pendingDownloadRefresh) {
         console.log('Window regained focus, refreshing document data after download...');
         pendingDownloadRefresh = false;
-        await fetchDocuments();
+        await fetchDocuments(currentPage, searchTerm, sortOrder);
       }
     };
 
@@ -200,7 +202,7 @@
 
   // Public method to fetch documents (called from parent)
   export function loadDocuments() {
-    return fetchDocuments();
+    return fetchDocuments(1, searchTerm, sortOrder);
   }
 
   // Public method to set search and sort parameters (called from parent)
@@ -208,7 +210,13 @@
     searchTerm = term;
     sortOrder = order;
     currentPage = 1; // Reset to first page when searching
-    fetchDocuments();
+    fetchDocuments(1, term, order);
+  }
+
+  // Public method to set date range filter (called from parent)
+  export function setDateRange(startDate: string | null, endDate: string | null) {
+    currentPage = 1; // Reset to page 1 when date filter changes
+    fetchDocuments(1, searchTerm, sortOrder, startDate, endDate);
   }
 
   // Modal state
@@ -248,7 +256,7 @@
         }
         
         // Refresh the document list after successful deletion
-        await fetchDocuments();
+        await fetchDocuments(currentPage, searchTerm, sortOrder);
         onDelete?.(documentToDelete);
       } else {
         modalToastStore.error('Failed to delete document: ' + response.message);

@@ -272,29 +272,9 @@
             type="text"
             readonly
             value={getDateRangeDisplay()}
-            placeholder="Select date range"
+            placeholder="Filter by date"
             onclick={openDateRangePicker}
             class="w-full px-3 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-          />
-          <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </div>
-      </div>
-
-      <!-- ✅ DESKTOP: Date range group (di kiri tombol Sort) -->
-      <div class="hidden sm:flex items-center gap-2">
-        <div class="relative">
-          <input
-            type="text"
-            readonly
-            value={getDateRangeDisplay()}
-            placeholder="Select date range"
-            onclick={openDateRangePicker}
-            class="w-48 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
           />
           <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -359,6 +339,26 @@
           <div
             class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"
           ></div>
+        </div>
+      </div>
+
+      <!-- ✅ DESKTOP: Date range group (di kanan tombol Sort) -->
+      <div class="hidden sm:flex items-center gap-2">
+        <div class="relative">
+          <input
+            type="text"
+            readonly
+            value={getDateRangeDisplay()}
+            placeholder="Filter by date"
+            onclick={openDateRangePicker}
+            class="w-48 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+          />
+          <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
         </div>
       </div>
 
@@ -525,7 +525,7 @@
             <line x1="8" y1="2" x2="8" y2="6"></line>
             <line x1="3" y1="10" x2="21" y2="10"></line>
           </svg>
-          Select Date Range
+          Filter by date
         </h3>
         <button onclick={() => showDateRangePicker = false} class="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,12 +1,17 @@
 <script lang="ts">
+  import DateRangePicker from '$lib/components/ui/DateRangePicker.svelte';
+
   interface $$Props {
     activeTab?: string;
     onTabChange?: (tab: string) => void;
     onSearch?: (term: string) => void;
     onSortChange?: (order: 'asc' | 'desc') => void;
     onRefresh?: () => void;
+    onDateRangeChange?: (payload: { startDate: string | null; endDate: string | null }) => void;
     searchTerm?: string;
     sortOrder?: 'asc' | 'desc';
+    startDate?: string | null;
+    endDate?: string | null;
     isLoading?: boolean;
   }
 
@@ -16,8 +21,11 @@
     onSearch,
     onSortChange, 
     onRefresh,
+    onDateRangeChange,
     searchTerm = "",
     sortOrder = 'desc',
+    startDate = null,
+    endDate = null,
     isLoading = false
   }: $$Props = $props();
 
@@ -155,6 +163,17 @@
         </div>
       </div>
 
+      <!-- Mobile: Date Range Filter -->
+      <div class="flex sm:hidden items-center gap-2 w-full mt-2">
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          onDateRangeChange={onDateRangeChange}
+          className="flex-1"
+          placeholder="Filter by date"
+        />
+      </div>
+
       <!-- Desktop: Sort Toggle Button -->
       <div class="hidden sm:block relative group">
         <button
@@ -196,6 +215,17 @@
           <!-- Tooltip arrow -->
           <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
         </div>
+      </div>
+
+      <!-- Desktop: Date Range Filter -->
+      <div class="hidden sm:flex items-center gap-2">
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          onDateRangeChange={onDateRangeChange}
+          className="w-48"
+          placeholder="Filter by date"
+        />
       </div>
 
       <!-- Desktop Search Bar -->
