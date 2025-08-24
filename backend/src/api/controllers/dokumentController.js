@@ -138,12 +138,12 @@ exports.uploadDocument = async (req, res) => {
   try {
     const file = req.file;
     if (!file) {
-      return errorStatus(res, "No file uploaded", 400);
+      return errorStatus(res, 400, "No file uploaded");
     }
 
     const { title, category_ids, remark } = req.body;
     if (!category_ids) {
-      return errorStatus(res, "Category IDs are required", 400);
+      return errorStatus(res , 400, "Category IDs are required");
     }
 
     const categoryIdArray = Array.isArray(category_ids)
@@ -153,7 +153,7 @@ exports.uploadDocument = async (req, res) => {
           .map((id) => parseInt(id.trim()));
 
     if (categoryIdArray.some(isNaN)) {
-      return errorStatus(res, "Invalid category ID format", 400);
+      return errorStatus(res , 400, "Invalid category ID format");
     }
 
     const result = await documentService.createDocument({
@@ -170,7 +170,7 @@ exports.uploadDocument = async (req, res) => {
     });
 
     if (!result.success) {
-      return errorStatus(res, result.msg || "Failed to create document", 500);
+      return errorStatus(res, 500, result.msg || "Failed to create document");
     }
 
     const docId = result.data.id;
@@ -182,7 +182,7 @@ exports.uploadDocument = async (req, res) => {
     });
   } catch (err) {
     console.error("uploadDocument error:", err);
-    return errorStatus(res, "Internal server error", 500);
+    return errorStatus(res , 500, "Internal server error");
   }
 };
 
