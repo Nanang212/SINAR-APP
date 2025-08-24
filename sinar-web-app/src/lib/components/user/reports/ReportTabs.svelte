@@ -11,7 +11,7 @@
   }
 
   let { 
-    activeTab = "input", 
+    activeTab = "browse", 
     onTabChange, 
     onSearch,
     onSortChange, 
@@ -60,18 +60,6 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-2 md:gap-3">
   <nav class="flex space-x-4 sm:space-x-8">
     <button
-      onclick={() => setActiveTab("input")}
-      class={getTabClass("input")}
-    >
-      <div class="flex items-center space-x-1 sm:space-x-2">
-        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-        </svg>
-        <span class="text-sm sm:text-base">Input</span>
-      </div>
-    </button>
-    
-    <button
       onclick={() => setActiveTab("browse")}
       class={getTabClass("browse")}
     >
@@ -80,6 +68,18 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v10a2 2 0 002 2z"/>
         </svg>
         <span class="text-sm sm:text-base">Browse</span>
+      </div>
+    </button>
+
+    <button
+      onclick={() => setActiveTab("input")}
+      class={getTabClass("input")}
+    >
+      <div class="flex items-center space-x-1 sm:space-x-2">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+        </svg>
+        <span class="text-sm sm:text-base">Input</span>
       </div>
     </button>
   </nav>

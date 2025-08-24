@@ -9,6 +9,7 @@
   import ConfirmationModal from '@/lib/components/ui/ConfirmationModal.svelte';
   import { modalToastStore } from '@/lib/stores/modal-toast';
   import Loading from '$lib/components/ui/loading.svelte';
+  import ReportDetailModal from '$lib/components/ui/ReportDetailModal.svelte';
 
   interface Document {
     id: string;
@@ -284,6 +285,10 @@
   let previewTitle = $state<string>('');
   let isLoadingPreview = $state(false);
 
+  // Report detail modal state
+  let isReportDetailOpen = $state(false);
+  let reportDetailData = $state<any>(null);
+
   async function handlePreview(doc: Document) {
     try {
       // Check if document is previewable (only .doc/.docx files)
@@ -315,6 +320,48 @@
     isPreviewOpen = false;
     previewContent = '';
     previewTitle = '';
+  }
+
+  function transformToReportData(apiDoc: ApiDocument): any {
+    // Transform the reports into the format expected by ReportDetailModal
+    const reports = apiDoc.reports || [];
+    
+    const reportsByType = {
+      TEXT: reports.filter(r => r.type === 'TEXT'),
+      LINK: reports.filter(r => r.type === 'LINK'), 
+      AUDIO: reports.filter(r => r.type === 'AUDIO'),
+      VIDEO: reports.filter(r => r.type === 'VIDEO'),
+    };
+
+    return {
+      document: {
+        id: apiDoc.id,
+        original_name: apiDoc.original_name,
+        url: apiDoc.url,
+        uploaded_at: apiDoc.uploaded_at,
+        title: apiDoc.title,
+        remark: apiDoc.remark,
+      },
+      reports: reportsByType
+    };
+  }
+
+  function handleDetail(doc: Document) {
+    // Find the original API document
+    const apiDoc = apiDocuments.find(d => d.id.toString() === doc.id);
+    if (!apiDoc) {
+      modalToastStore.error('Document not found');
+      return;
+    }
+
+    // Transform to report data format
+    reportDetailData = transformToReportData(apiDoc);
+    isReportDetailOpen = true;
+  }
+
+  function closeReportDetail() {
+    isReportDetailOpen = false;
+    reportDetailData = null;
   }
 
   // Check if document can be previewed
@@ -534,21 +581,19 @@
                 <!-- Actions Cell -->
                 <td class="px-3 sm:px-6 py-4 text-sm font-medium">
                   <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
-                    <!-- Preview Button -->
+                    <!-- Detail Button -->
                     <div class="relative group">
                       <button
-                        onclick={() => handlePreview(doc)}
-                        disabled={!canPreview(doc.original_name) || isLoadingPreview}
-                        class="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed {canPreview(doc.original_name) ? '' : 'opacity-50'}"
-                        aria-label="Preview document"
+                        onclick={() => handleDetail(doc)}
+                        class="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
+                        aria-label="View document details and reports"
                       >
                         <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </button>
                       <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                        {canPreview(doc.original_name) ? 'Preview' : 'Preview not available'}
+                        Detail
                       </div>
                     </div>
 
@@ -935,3 +980,11 @@
     </div>
   </div>
 {/if}
+
+<!-- Report Detail Modal -->
+<ReportDetailModal 
+  isOpen={isReportDetailOpen}
+  reportData={reportDetailData}
+  onClose={closeReportDetail}
+  modalType="document"
+/>

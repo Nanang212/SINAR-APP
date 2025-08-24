@@ -17,7 +17,7 @@
     hasAccess = access;
   });
 
-  let activeTab = $state("input");
+  let activeTab = $state("browse");
   let documentTableRef = $state<DocumentTable>();
   let selectedDocument = $state<Document | null>(null);
   let searchTerm = $state("");
@@ -30,7 +30,7 @@
     activeTab = tab;
     console.log('New activeTab:', activeTab);
     
-    // Fetch documents when switching to browse tab
+    // Fetch documents when switching to browse tab (now on the left)
     if (tab === "browse" && documentTableRef) {
       console.log('Loading documents...');
       documentTableRef.loadDocuments();
@@ -88,7 +88,7 @@
   function handleRowClick(document: Document) {
     console.log('Row clicked:', document);
     selectedDocument = document;
-    activeTab = "input"; // Switch to input tab
+    activeTab = "input"; // Switch to input tab (now on the right)
   }
 
 </script>

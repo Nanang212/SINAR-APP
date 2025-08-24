@@ -17,7 +17,7 @@
     hasAccess = access;
   });
 
-  let activeTab = $state("input");
+  let activeTab = $state("browse");
   let reportTableRef = $state<any>();
   let searchTerm = $state("");
   let sortOrder = $state<'asc' | 'desc'>('desc');

@@ -18,7 +18,7 @@
     hasAccess = access;
   });
 
-  let activeTab = $state("input");
+  let activeTab = $state("browse");
   let userTableRef = $state<UserTable>();
   let selectedUser = $state<User | null>(null);
   let searchTerm = $state("");

@@ -19,7 +19,7 @@
   });
 
   // Component state
-  let activeTab = $state("input");
+  let activeTab = $state("browse");
   let searchTerm = $state("");
   let sortOrder = $state<'asc' | 'desc'>('desc');
   let isLoading = $state(false);
