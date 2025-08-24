@@ -23,6 +23,10 @@
   let searchTerm = $state("");
   let sortOrder = $state<'asc' | 'desc'>('desc');
   let isLoading = $state(false);
+  
+  // Date filter state
+  let startDate = $state<string | null>(null);
+  let endDate = $state<string | null>(null);
 
   function handleTabChange(tab: string) {
     console.log('Tab change requested:', tab);
@@ -91,6 +95,15 @@
     activeTab = "input"; // Switch to input tab (now on the right)
   }
 
+  function handleDateRangeChange(payload: { startDate: string | null; endDate: string | null }) {
+    console.log('Page: Date range changed:', payload);
+    startDate = payload.startDate;
+    endDate = payload.endDate;
+    if (documentTableRef) {
+      documentTableRef.setDateRange(startDate, endDate);
+    }
+  }
+
 </script>
 
 <DashboardLayout>
@@ -108,8 +121,11 @@
             onSearch={handleSearch}
             onSortChange={handleSortChange}
             onRefresh={handleRefresh}
+            onDateRangeChange={handleDateRangeChange}
             {searchTerm}
             {sortOrder}
+            {startDate}
+            {endDate}
             {isLoading}
           />
         </div>
