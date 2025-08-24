@@ -40,6 +40,7 @@ export interface PaginationParams {
   limit?: number;
   search?: string;
   order?: 'asc' | 'desc';
+  is_report?: 'true' | 'false';
 }
 
 export interface UploadDocumentRequest {
@@ -63,7 +64,7 @@ class DocumentService {
   /**
    * Get all documents
    */
-  async getAllDocuments(params?: { search?: string; order?: 'asc' | 'desc' }): Promise<ApiResponse<Document[]>> {
+  async getAllDocuments(params?: { search?: string; order?: 'asc' | 'desc'; is_report?: 'true' | 'false' }): Promise<ApiResponse<Document[]>> {
     try {
       const queryParams = new URLSearchParams();
 
@@ -75,6 +76,11 @@ class DocumentService {
       // Add order parameter if provided
       if (params?.order && (params.order === 'asc' || params.order === 'desc')) {
         queryParams.append('order', params.order);
+      }
+
+      // Add is_report parameter if provided
+      if (params?.is_report && (params.is_report === 'true' || params.is_report === 'false')) {
+        queryParams.append('is_report', params.is_report);
       }
 
       const fullUrl = queryParams.toString() 
@@ -123,7 +129,7 @@ class DocumentService {
    */
   async getPaginatedDocuments(params: PaginationParams = {}): Promise<ApiResponse<PaginatedDocumentsResponse>> {
     try {
-      const { page = 1, limit = 10, search, order } = params;
+      const { page = 1, limit = 10, search, order, is_report } = params;
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
@@ -139,9 +145,14 @@ class DocumentService {
         queryParams.append('order', order);
       }
 
+      // Add is_report parameter if provided
+      if (is_report && (is_report === 'true' || is_report === 'false')) {
+        queryParams.append('is_report', is_report);
+      }
+
       const fullUrl = `${this.baseEndpoint}?${queryParams.toString()}`;
       console.log('🚀 Document Service - Making request to:', fullUrl);
-      console.log('📋 Request parameters:', { page, limit, search, order });
+      console.log('📋 Request parameters:', { page, limit, search, order, is_report });
       
       const response = await httpClient.authenticatedRequest<any>(fullUrl);
 

@@ -126,11 +126,13 @@
     
     try {
       // Use paginated documents with fixed order 'desc' (newest first)
+      // Filter by is_report: false for create mode, no filter for edit mode
       const response = await documentService.getPaginatedDocuments({
         page: page,
         limit: 10,
         search: search.trim() || undefined,
-        order: 'desc' // Always newest first
+        order: 'desc', // Always newest first
+        is_report: isEditMode ? undefined : 'false'
       });
       
       console.log('📋 Document response:', response);
@@ -523,18 +525,21 @@
     // Filter items that have content changes  
     const changedItems = mediaItems.filter(item => item.hasChanges === true);
     
-    // Get items that need description-only updates (not deleted, not content-changed)
+    // Get new items that need to be created (not existing items)
+    const newItems = mediaItems.filter(item => !item.isExisting && !item.hasChanges);
+    
+    // Get items that need description-only updates (not deleted, not content-changed, not new)
     const itemsNotDeleted = mediaItems.filter(item => !deletedItems.some(deletedItem => deletedItem.id === item.id));
-    const descriptionOnlyItems = itemsNotDeleted.filter(item => !item.hasChanges);
+    const descriptionOnlyItems = itemsNotDeleted.filter(item => !item.hasChanges && item.isExisting);
     
     // Check if there are any operations needed
-    if (changedItems.length === 0 && deletedItems.length === 0 && !isDescriptionChanged) {
+    if (changedItems.length === 0 && deletedItems.length === 0 && newItems.length === 0 && !isDescriptionChanged) {
       modalToastStore.success('No changes to save');
       return;
     }
 
     // Calculate progress counter (exclude description-only updates)
-    const progressOperations = changedItems.length + deletedItems.length;
+    const progressOperations = changedItems.length + deletedItems.length + newItems.length;
     uploadProgress.total = progressOperations;
     uploadProgress.current = 0;
 
@@ -630,11 +635,98 @@
       }
     }
 
+    // Process new items (CREATE)
+    let createdCount = 0;
+    for (let i = 0; i < newItems.length; i++) {
+      const item = newItems[i];
+      uploadProgress.current = changedItems.length + i + 1;
+      
+      const displayName = item.file ? item.file.name : 
+                         item.url ? item.url.substring(0, 30) + '...' : 
+                         item.text ? item.text.substring(0, 30) + '...' : 
+                         `${item.type} item`;
+      
+      uploadProgress.currentFile = `Creating: ${displayName}`;
+
+      try {
+        let serviceType: string;
+        let content: FormData | object;
+
+        if (item.type === 'audio' || item.type === 'video') {
+          if (!item.file) {
+            failedItems.push(displayName);
+            modalToastStore.error(`No file provided for ${item.type}`);
+            continue;
+          }
+          serviceType = item.type.toUpperCase();
+          content = new FormData();
+          content.append('file', item.file);
+        } else if (item.type === 'url') {
+          if (!item.url) {
+            failedItems.push(displayName);
+            modalToastStore.error('No URL provided');
+            continue;
+          }
+          serviceType = 'LINK';
+          content = { link: item.url };
+        } else if (item.type === 'notes') {
+          if (!item.text) {
+            failedItems.push(displayName);
+            modalToastStore.error('No text provided for notes');
+            continue;
+          }
+          serviceType = 'TEXT';
+          content = { text: item.text };
+        } else {
+          failedItems.push(displayName);
+          modalToastStore.error(`Unknown item type: ${item.type}`);
+          continue;
+        }
+
+        console.log(`Creating new ${item.type} ${i + 1}/${newItems.length}: ${displayName}`);
+        
+        // Create FormData like in create mode
+        const formData = new FormData();
+        formData.append('document_id', selectedDocumentId!);
+        
+        // Add description (same as create mode)
+        if (description) {
+          formData.append('description', description);
+        }
+        
+        // Add content based on type (same as create mode logic)
+        if (item.file) {
+          formData.append(item.type, item.file);  // key: "audio" or "video", value: File
+        } else if (item.url) {
+          formData.append('link', item.url);      // key: "link", value: string
+        } else if (item.text) {
+          formData.append('text', item.text);     // key: "text", value: string
+        }
+
+        const result = await reportService.createReportWithFormData(formData);
+        
+        if (result.status) {
+          createdCount++;
+          console.log(`✅ Successfully created ${item.type}: ${displayName}`);
+        } else {
+          console.error(`❌ Failed to create ${item.type}:`, result.message);
+          failedItems.push(displayName);
+        }
+      } catch (error) {
+        console.error(`❌ Error creating ${item.type}:`, error);
+        failedItems.push(displayName);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Check can be added if stop mechanism is implemented
+    }
+
     // Process deletions
     let deletedCount = 0;
     for (let i = 0; i < deletedItems.length; i++) {
       const item = deletedItems[i];
-      uploadProgress.current = changedItems.length + i + 1;
+      uploadProgress.current = changedItems.length + newItems.length + i + 1;
       
       const displayName = item.originalName || item.url || item.text || `${item.type} item`;
       uploadProgress.currentFile = `Deleting: ${displayName}`;
@@ -690,7 +782,7 @@
     }
 
     // Show final results
-    const totalSuccessful = successCount + deletedCount;
+    const totalSuccessful = successCount + createdCount + deletedCount;
     
     if ((totalSuccessful > 0 || descriptionSuccessCount > 0) && failedItems.length === 0) {
       let message = '';
@@ -698,6 +790,9 @@
       
       if (successCount > 0) {
         parts.push(`updated ${successCount} content item(s)`);
+      }
+      if (createdCount > 0) {
+        parts.push(`created ${createdCount} new item(s)`);
       }
       if (deletedCount > 0) {
         parts.push(`deleted ${deletedCount} item(s)`);
@@ -1549,7 +1644,7 @@
         
         {#if !isEditMode}
           <div class="relative">
-            <!-- Add Media Button -->
+            <!-- Add Media Button for Create Mode -->
             <button
               type="button"
               onclick={toggleAddMediaDropdown}
@@ -1626,7 +1721,91 @@
           {/if}
         </div>
 
-          <!-- Media Form Modal -->
+          <!-- Media Form Modal will be shared between create and edit mode -->
+        {:else}
+          <!-- Edit Mode with Add Media Button -->
+          <div class="space-y-4">
+            <!-- Add Media Button for Edit Mode -->
+            <div class="relative">
+              <button
+                type="button"
+                onclick={toggleAddMediaDropdown}
+                disabled={shouldDisableForm}
+                class="w-full px-4 py-3 text-base border-2 border-dashed border-green-300 rounded-lg bg-green-50 hover:bg-green-100 hover:border-green-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span class="text-green-700 font-medium">Add New Media to Report</span>
+              </button>
+
+              <!-- Add Media Dropdown for Edit Mode -->
+              {#if showAddMediaDropdown}
+                <div class="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <div class="p-2">
+                    <button
+                      type="button"
+                      onclick={() => selectMediaType('audio')}
+                      class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                    >
+                      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                      </svg>
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Audio File</div>
+                        <div class="text-xs text-gray-500">MP3, M4A, WAV, AAC</div>
+                      </div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onclick={() => selectMediaType('video')}
+                      class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                    >
+                      <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Video File</div>
+                        <div class="text-xs text-gray-500">MP4, AVI, MOV, WMV, MKV</div>
+                      </div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onclick={() => selectMediaType('url')}
+                      class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                    >
+                      <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">URL Link</div>
+                        <div class="text-xs text-gray-500">Website or online resource</div>
+                      </div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onclick={() => selectMediaType('notes')}
+                      class="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                    >
+                      <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Notes</div>
+                        <div class="text-xs text-gray-500">Text notes or observations</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Media Form Modal - Shared between Create and Edit Mode -->
         {#if showMediaForm && currentMediaType}
           <div class="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
             <div class="flex items-center justify-between mb-4">
@@ -1697,7 +1876,7 @@
                               aria-label="Remove URL from list"
                             >
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                             </button>
                           </div>
@@ -1806,20 +1985,6 @@
                   </button>
                 </div>
               {/if}
-            </div>
-          </div>
-        {/if}
-        {:else}
-          <!-- Edit Mode Message -->
-          <div class="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
-            <div class="flex items-center space-x-3">
-              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <div>
-                <div class="text-sm font-medium text-blue-900">Edit Mode</div>
-                <div class="text-xs text-blue-700">You can edit individual media items in the table below. Click the edit button next to any item to modify it.</div>
-              </div>
             </div>
           </div>
         {/if}
