@@ -666,7 +666,7 @@
           <!-- User Avatar Button -->
           <button
             onclick={toggleProfileDropdown}
-            class="w-12 h-12 rounded-full flex items-center justify-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 {userLogo
+            class="w-14 h-14 rounded-full flex items-center justify-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 {userLogo
               ? ''
               : 'bg-blue-500 hover:bg-blue-600'}"
             title="Profile menu"
