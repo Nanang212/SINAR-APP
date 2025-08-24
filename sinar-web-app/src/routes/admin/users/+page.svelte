@@ -29,6 +29,21 @@
   function handleTabChange(tab: string) {
     console.log('Tab change requested:', tab);
     console.log('Current activeTab:', activeTab);
+    
+    // If switching from browse to input, only reset if no user is selected or create mode
+    // Don't reset if we have selectedUser (edit mode) - let the user manually reset or select new data
+    if (activeTab === "browse" && tab === "input") {
+      console.log('Switching to input tab');
+      // Only clear selectedUser if we're in create mode (no user selected)
+      // For edit mode, keep the selectedUser so form maintains its state
+      if (!selectedUser) {
+        console.log('No selected user - clearing for create mode');
+        selectedUser = null;
+      } else {
+        console.log('Keeping selected user for edit mode');
+      }
+    }
+    
     activeTab = tab;
     console.log('New activeTab:', activeTab);
     
@@ -122,10 +137,14 @@
       </div>
       
       <!-- Tab Content -->
-      <div class="absolute inset-0 pt-[120px] sm:pt-[130px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
-        {#if activeTab === "input"}
+      <div class="absolute inset-0 pt-[120px] sm:pt-[130px]">
+        <!-- UserForm - always rendered but hidden when not active -->
+        <div class="{activeTab === 'input' ? 'block overflow-y-auto overflow-x-hidden' : 'hidden'} h-full">
           <UserForm onSubmit={handleFormSubmit} onReset={handleFormReset} userData={selectedUser} />
-        {:else if activeTab === "browse"}
+        </div>
+        
+        <!-- UserTable - always rendered but hidden when not active -->
+        <div class="{activeTab === 'browse' ? 'block overflow-hidden' : 'hidden'} h-full">
           <UserTable 
             bind:this={userTableRef}
             fetchOnMount={true}
@@ -135,7 +154,7 @@
             {searchTerm}
             {sortOrder}
           />
-        {/if}
+        </div>
       </div>
     </div>
   {/if}

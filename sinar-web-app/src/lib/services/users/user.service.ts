@@ -435,6 +435,44 @@ class UserService {
       };
     }
   }
+
+  /**
+   * Get user profile photo preview with authorization
+   * Creates a blob URL that can be used as img src
+   */
+  async getUserProfilePhotoUrl(userId: string | number): Promise<string | null> {
+    try {
+      const response = await httpClient.authenticatedRequest<Blob>(
+        `${this.adminBaseEndpoint}/preview/${userId}`,
+        {
+          method: 'GET',
+          responseType: 'blob'
+        }
+      );
+
+      if (response.data instanceof Blob) {
+        // Create blob URL for the image
+        return URL.createObjectURL(response.data);
+      }
+
+      console.warn('Profile photo response is not a blob');
+      return null;
+    } catch (error) {
+      console.error('Failed to fetch profile photo:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Revoke blob URL to free memory
+   */
+  revokeProfilePhotoUrl(url: string) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.warn('Failed to revoke blob URL:', error);
+    }
+  }
 }
 
 // Export singleton instance

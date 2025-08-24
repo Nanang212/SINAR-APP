@@ -400,26 +400,7 @@
                 </td>
                 <!-- Actions Cell -->
                 <td class="px-3 sm:px-6 py-4 text-sm font-medium">
-                  <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
-                    <!-- Edit Button -->
-                    <div class="relative group">
-                      <button
-                        onclick={() => handleRowClick(user)}
-                        class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                        aria-label="Edit user"
-                      >
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                        Edit
-                      </div>
-                    </div>
-
-                    <!-- Divider -->
-                    <div class="h-6 w-px bg-gray-300"></div>
-
+                  <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
                     <!-- Delete Button -->
                     <div class="relative group">
                       <button class="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors" onclick={() => handleDelete(user)} aria-label="Delete user">
