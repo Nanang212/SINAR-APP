@@ -10,7 +10,6 @@
   let showRedirectLoading = $state(false);
 
   onMount(async () => {
-    // Guard protected page with loading - redirect to login if not authenticated
     const access = await LoadingAuthGuard.guardProtectedPage((loading) => {
       showRedirectLoading = loading;
     });
@@ -24,12 +23,15 @@
   let isLoading = $state(false);
   let selectedReportData = $state<any>(null);
 
+  // ✅ TAMBAHAN: state untuk filter tanggal (format "YYYY-MM-DD" atau null)
+  let startDate = $state<string | null>(null);
+  let endDate   = $state<string | null>(null);
+
   function handleTabChange(tab: string) {
     console.log('Page: Received tab change to:', tab);
     activeTab = tab;
-    
-    // If switching to browse tab, load reports
     if (tab === "browse" && reportTableRef) {
+      // reload data ketika balik ke browse
       reportTableRef.loadReports();
     }
   }
@@ -54,6 +56,18 @@
       reportTableRef.loadReports().finally(() => {
         isLoading = false;
       });
+    }
+  }
+
+  // ✅ TAMBAHAN: handler ketika date range berubah dari ReportTabs
+  function handleDateRangeChange(payload: { startDate: string | null; endDate: string | null }) {
+    startDate = payload.startDate;
+    endDate = payload.endDate;
+    // kalau tabel expose setDateRange, panggil; kalau tidak, cukup loadReports
+    if (reportTableRef?.setDateRange) {
+      reportTableRef.setDateRange(startDate, endDate);
+    } else {
+      reportTableRef?.loadReports?.();
     }
   }
 
@@ -95,6 +109,9 @@
             {searchTerm}
             {sortOrder}
             {isLoading}
+            startDate={startDate}
+            endDate={endDate}
+            onDateRangeChange={handleDateRangeChange}
           />
         </div>
       </div>
@@ -115,6 +132,8 @@
             onRowClick={handleRowClick}
             {searchTerm}
             {sortOrder}
+            startDate={startDate}
+            endDate={endDate}
           />
         {/if}
       </div>
