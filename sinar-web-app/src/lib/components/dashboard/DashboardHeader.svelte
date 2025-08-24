@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { authService, userService, type ChangePasswordRequest } from "$lib/services";
+  import {
+    authService,
+    userService,
+    type ChangePasswordRequest,
+  } from "$lib/services";
   import { NavigationHelper } from "$lib/utils";
   import { Loading, toastStore, ConfirmationModal } from "$lib";
   import { modalToastStore } from "$lib/stores/modal-toast";
@@ -30,61 +34,71 @@
     // Check if this is a fresh session (after login/logout/token refresh)
     const isFreshSession = checkIfFreshSession();
     if (isFreshSession) {
-      console.log('Fresh session detected, clearing all cache');
+      console.log("Fresh session detected, clearing all cache");
       clearAllCache();
     }
-    
+
     // Load cached profile photo immediately if available (and not fresh session)
     if (!isFreshSession) {
       loadCachedPhotoImmediately();
     }
-    
+
     // Async initialization
     (async () => {
       // Get user data from backend
       const currentUser = authService.getCurrentUser();
       if (currentUser) {
         let shouldUseCache = false;
-        
+
         // Only use cache if NOT a fresh session and cache exists
         if (!isFreshSession) {
           const cachedUser = getCachedUserData(currentUser.id);
           if (cachedUser) {
-            console.log('Using cached user data, no API call needed');
+            console.log("Using cached user data, no API call needed");
             await setUserDataFromCache(cachedUser);
             shouldUseCache = true;
           }
         }
-        
+
         if (!shouldUseCache) {
-          console.log('Fresh session or no cache - fetching user data from API');
-          
+          console.log(
+            "Fresh session or no cache - fetching user data from API"
+          );
+
           try {
             // Use userService instead of authService to get full user data including logo_url
             const response = await userService.getUserById(currentUser.id);
-            
+
             if (response.status && response.data) {
               // Cache the user data
               setCachedUserData(currentUser.id, response.data);
-              
+
               userName = response.data.username;
               userInitial = response.data.username.charAt(0).toUpperCase();
-              
+
               // Try multiple ways to get role_id
-              userRoleId = response.data.role_id || 
-                          response.data.role?.id || 
-                          null;
-              
-              console.log('Fresh user data loaded, userRoleId:', userRoleId);
-              
+              userRoleId =
+                response.data.role_id || response.data.role?.id || null;
+
+              console.log("Fresh user data loaded, userRoleId:", userRoleId);
+
               // Load profile photo with dynamic cache key based on updated_at or filepath
               if (response.data.id) {
-                const cacheVersion = response.data.updated_at || response.data.filepath || Date.now().toString();
-                console.log('Loading fresh profile photo with version:', cacheVersion);
+                const cacheVersion =
+                  response.data.updated_at ||
+                  response.data.filepath ||
+                  Date.now().toString();
+                console.log(
+                  "Loading fresh profile photo with version:",
+                  cacheVersion
+                );
                 await loadProfilePhotoWithCache(response.data.id, cacheVersion);
               }
             } else {
-              console.log('Response failed:', response.message || 'Unknown error');
+              console.log(
+                "Response failed:",
+                response.message || "Unknown error"
+              );
             }
           } catch (error) {
             console.error("Failed to fetch user data:", error);
@@ -92,10 +106,10 @@
             userName = currentUser.username;
             userInitial = currentUser.username.charAt(0).toUpperCase();
             userLogo = null;
-            userRoleId = typeof currentUser.role === 'string' ? null : null;
+            userRoleId = typeof currentUser.role === "string" ? null : null;
           }
         }
-        
+
         // Mark session as not fresh after first load
         markSessionAsNotFresh();
       }
@@ -119,9 +133,9 @@
     return () => {
       clearInterval(interval);
       document.removeEventListener("click", handleClickOutside);
-      
+
       // Clean up blob URL if it's a blob (base64 data URLs don't need cleanup)
-      if (userLogo && userLogo.startsWith('blob:')) {
+      if (userLogo && userLogo.startsWith("blob:")) {
         userService.revokeProfilePhotoUrl(userLogo);
       }
     };
@@ -184,14 +198,14 @@
   async function handleChangePassword() {
     showChangePasswordConfirmation = false;
     isChangingPassword = true;
-    
+
     // Show loading toast
     const loadingToastId = toastStore.info("Changing password...", 0); // 0 duration means no auto-close
 
     try {
       // Add slight delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       const request: ChangePasswordRequest = {
         old_password: changePasswordForm.old_password,
         new_password: changePasswordForm.new_password,
@@ -203,9 +217,11 @@
       toastStore.remove(loadingToastId);
 
       if (response.status) {
-        modalToastStore.success("Password changed successfully! You will be logged out in 3 seconds.");
+        modalToastStore.success(
+          "Password changed successfully! You will be logged out in 3 seconds."
+        );
         closeChangePasswordModal();
-        
+
         // Auto logout after password change
         setTimeout(async () => {
           try {
@@ -219,10 +235,15 @@
         }, 3000); // 3 seconds delay to let user read the success message
       } else {
         // Handle specific error messages
-        if (response.message?.includes("incorrect") || response.message?.includes("wrong")) {
+        if (
+          response.message?.includes("incorrect") ||
+          response.message?.includes("wrong")
+        ) {
           modalToastStore.error("Current password is incorrect");
         } else {
-          modalToastStore.error(response.message || "Failed to change password");
+          modalToastStore.error(
+            response.message || "Failed to change password"
+          );
         }
       }
     } catch (error) {
@@ -277,65 +298,75 @@
     return `profile_photo_${userId}_${version}`;
   }
 
-  function getCachedPhoto(cacheKey: string): { url: string; timestamp: number } | null {
+  function getCachedPhoto(
+    cacheKey: string
+  ): { url: string; timestamp: number } | null {
     try {
-      if (typeof window === 'undefined') return null;
-      
+      if (typeof window === "undefined") return null;
+
       const cached = localStorage.getItem(cacheKey);
       if (!cached) return null;
-      
+
       const parsed = JSON.parse(cached);
       // No expiry check - cache persists until logout
       return parsed;
     } catch (error) {
-      console.error('Error reading cache:', error);
+      console.error("Error reading cache:", error);
       return null;
     }
   }
 
   function setCachedPhoto(cacheKey: string, url: string): void {
     try {
-      if (typeof window === 'undefined') return;
-      
+      if (typeof window === "undefined") return;
+
       const cacheData = {
         url,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
+
       localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      console.log('Cached photo with key:', cacheKey, 'URL length:', url.length);
+      console.log(
+        "Cached photo with key:",
+        cacheKey,
+        "URL length:",
+        url.length
+      );
     } catch (error) {
-      console.error('Error setting cache:', error);
+      console.error("Error setting cache:", error);
     }
   }
 
   function clearAllCache(): void {
     try {
-      if (typeof window === 'undefined') return;
-      
+      if (typeof window === "undefined") return;
+
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('profile_photo_') || key.startsWith('user_data_'))) {
+        if (
+          key &&
+          (key.startsWith("profile_photo_") || key.startsWith("user_data_"))
+        ) {
           keysToRemove.push(key);
         }
       }
-      
-      keysToRemove.forEach(key => localStorage.removeItem(key));
+
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
       if (keysToRemove.length > 0) {
         console.log(`Cleared ${keysToRemove.length} cached entries`);
       }
     } catch (error) {
-      console.error('Error during cache cleanup:', error);
+      console.error("Error during cache cleanup:", error);
     }
   }
 
   // Session freshness tracking
   function checkIfFreshSession(): boolean {
     try {
-      if (typeof window === 'undefined') return true;
-      const sessionFlag = sessionStorage.getItem('dashboard_session_fresh');
-      return sessionFlag !== 'false'; // Default to fresh if not set
+      if (typeof window === "undefined") return true;
+      const sessionFlag = sessionStorage.getItem("dashboard_session_fresh");
+      return sessionFlag !== "false"; // Default to fresh if not set
     } catch (error) {
       return true; // Default to fresh on error
     }
@@ -343,62 +374,61 @@
 
   function markSessionAsNotFresh(): void {
     try {
-      if (typeof window === 'undefined') return;
-      sessionStorage.setItem('dashboard_session_fresh', 'false');
+      if (typeof window === "undefined") return;
+      sessionStorage.setItem("dashboard_session_fresh", "false");
     } catch (error) {
-      console.error('Error marking session as not fresh:', error);
+      console.error("Error marking session as not fresh:", error);
     }
   }
 
   function markSessionAsFresh(): void {
     try {
-      if (typeof window === 'undefined') return;
-      sessionStorage.removeItem('dashboard_session_fresh');
+      if (typeof window === "undefined") return;
+      sessionStorage.removeItem("dashboard_session_fresh");
     } catch (error) {
-      console.error('Error marking session as fresh:', error);
+      console.error("Error marking session as fresh:", error);
     }
   }
 
   // User data caching functions
   function getCachedUserData(userId: number): any | null {
     try {
-      if (typeof window === 'undefined') return null;
-      
+      if (typeof window === "undefined") return null;
+
       const cached = localStorage.getItem(`user_data_${userId}`);
       if (!cached) return null;
-      
+
       const parsed = JSON.parse(cached);
       return parsed;
     } catch (error) {
-      console.error('Error reading user data cache:', error);
+      console.error("Error reading user data cache:", error);
       return null;
     }
   }
 
   function setCachedUserData(userId: number, userData: any): void {
     try {
-      if (typeof window === 'undefined') return;
+      if (typeof window === "undefined") return;
       localStorage.setItem(`user_data_${userId}`, JSON.stringify(userData));
-      console.log('Cached user data for user ID:', userId);
+      console.log("Cached user data for user ID:", userId);
     } catch (error) {
-      console.error('Error setting user data cache:', error);
+      console.error("Error setting user data cache:", error);
     }
   }
 
   async function setUserDataFromCache(userData: any): Promise<void> {
     userName = userData.username;
     userInitial = userData.username.charAt(0).toUpperCase();
-    
+
     // Try multiple ways to get role_id
-    userRoleId = userData.role_id || 
-                userData.role?.id || 
-                null;
-    
-    console.log('Set user data from cache, userRoleId:', userRoleId);
-    
+    userRoleId = userData.role_id || userData.role?.id || null;
+
+    console.log("Set user data from cache, userRoleId:", userRoleId);
+
     // Load profile photo from cache if available
     if (userData.id && !userLogo) {
-      const cacheVersion = userData.updated_at || userData.filepath || 'current';
+      const cacheVersion =
+        userData.updated_at || userData.filepath || "current";
       await loadProfilePhotoWithCache(userData.id, cacheVersion);
     }
   }
@@ -407,107 +437,195 @@
     try {
       const currentUser = authService.getCurrentUser();
       if (!currentUser) return;
-      
+
       // Try to get cached user data to determine the correct cache version
       const cachedUser = getCachedUserData(currentUser.id);
-      const cacheVersion = cachedUser ? (cachedUser.updated_at || cachedUser.filepath || 'current') : 'current';
+      const cacheVersion = cachedUser
+        ? cachedUser.updated_at || cachedUser.filepath || "current"
+        : "current";
       const photoKey = getCacheKey(currentUser.id, cacheVersion);
       const cached = getCachedPhoto(photoKey);
-      
-      if (cached && cached.url && cached.url.startsWith('data:')) {
+
+      if (cached && cached.url && cached.url.startsWith("data:")) {
         userLogo = cached.url;
         cachedPhotoUrl = cached.url;
         cacheKey = photoKey;
-        console.log('Profile photo loaded immediately from cache (no flicker)');
+        console.log("Profile photo loaded immediately from cache (no flicker)");
       }
     } catch (error) {
-      console.error('Error loading immediate cache:', error);
+      console.error("Error loading immediate cache:", error);
     }
   }
 
-  async function loadProfilePhotoWithCache(userId: number, version: string): Promise<void> {
+  // async function loadProfilePhotoWithCache(userId: number, version: string): Promise<void> {
+  //   const newCacheKey = getCacheKey(userId, version);
+  //   console.log('Loading profile photo with cache key:', newCacheKey);
+
+  //   // If we already have this version cached, use it immediately
+  //   if (newCacheKey === cacheKey && cachedPhotoUrl) {
+  //     userLogo = cachedPhotoUrl;
+  //     console.log('Using already loaded cached profile photo');
+  //     return;
+  //   }
+
+  //   // Check cache first
+  //   const cached = getCachedPhoto(newCacheKey);
+  //   if (cached && cached.url) {
+  //     console.log('Found cached photo in localStorage');
+
+  //     // Check if it's a blob URL (invalid after page refresh) or base64 (valid)
+  //     if (cached.url.startsWith('blob:')) {
+  //       console.log('Cached URL is blob (invalid after refresh), will fetch fresh from API');
+  //       // Remove invalid blob cache
+  //       localStorage.removeItem(newCacheKey);
+  //     } else if (cached.url.startsWith('data:')) {
+  //       console.log('Cached URL is base64 (valid), using cached photo');
+  //       userLogo = cached.url;
+  //       cachedPhotoUrl = cached.url;
+  //       cacheKey = newCacheKey;
+  //       console.log('Profile photo loaded from cache (persists until logout)');
+  //       return;
+  //     } else {
+  //       console.log('Unknown cached URL format:', cached.url.substring(0, 50));
+  //       // Remove unknown format cache
+  //       localStorage.removeItem(newCacheKey);
+  //     }
+  //   } else {
+  //     console.log('No cached photo found for key:', newCacheKey);
+  //   }
+
+  //   // Not in cache, fetch from API
+  //   try {
+  //     console.log('Fetching profile photo from API for userId:', userId);
+  //     const blobUrl = await userService.getUserProfilePhotoUrl(userId);
+
+  //     if (blobUrl) {
+  //       console.log('API returned blob URL, converting to base64...');
+
+  //       // Convert blob URL to base64 for persistent storage
+  //       try {
+  //         const response = await fetch(blobUrl);
+  //         const blob = await response.blob();
+
+  //         // Convert blob to base64
+  //         const base64 = await new Promise<string>((resolve, reject) => {
+  //           const reader = new FileReader();
+  //           reader.onload = () => resolve(reader.result as string);
+  //           reader.onerror = reject;
+  //           reader.readAsDataURL(blob);
+  //         });
+
+  //         // Cache the base64 string (will persist after refresh)
+  //         setCachedPhoto(newCacheKey, base64);
+  //         userLogo = base64;
+  //         cachedPhotoUrl = base64;
+  //         cacheKey = newCacheKey;
+
+  //         // Clean up the temporary blob URL
+  //         userService.revokeProfilePhotoUrl(blobUrl);
+
+  //         console.log('✅ Profile photo fetched and cached as base64');
+  //       } catch (conversionError) {
+  //         console.error('❌ Failed to convert blob to base64:', conversionError);
+  //         // Fallback to blob URL (won't persist after refresh)
+  //         userLogo = blobUrl;
+  //         cachedPhotoUrl = null;
+  //         cacheKey = null;
+  //       }
+  //     } else {
+  //       console.log('No profile photo available from API');
+  //       userLogo = null;
+  //       cachedPhotoUrl = null;
+  //       cacheKey = null;
+  //     }
+  //   } catch (photoError) {
+  //     console.error('❌ Failed to load profile photo from API:', photoError);
+  //     userLogo = null;
+  //     cachedPhotoUrl = null;
+  //     cacheKey = null;
+  //   }
+  // }
+
+  async function loadProfilePhotoWithCache(
+    userId: number,
+    version: string
+  ): Promise<void> {
     const newCacheKey = getCacheKey(userId, version);
-    console.log('Loading profile photo with cache key:', newCacheKey);
-    
-    // If we already have this version cached, use it immediately
+    console.log("Loading profile photo with cache key:", newCacheKey);
+
     if (newCacheKey === cacheKey && cachedPhotoUrl) {
       userLogo = cachedPhotoUrl;
-      console.log('Using already loaded cached profile photo');
+      console.log("Using already loaded cached profile photo");
       return;
     }
-    
-    // Check cache first
+
     const cached = getCachedPhoto(newCacheKey);
     if (cached && cached.url) {
-      console.log('Found cached photo in localStorage');
-      
-      // Check if it's a blob URL (invalid after page refresh) or base64 (valid)
-      if (cached.url.startsWith('blob:')) {
-        console.log('Cached URL is blob (invalid after refresh), will fetch fresh from API');
-        // Remove invalid blob cache
+      if (cached.url.startsWith("blob:")) {
         localStorage.removeItem(newCacheKey);
-      } else if (cached.url.startsWith('data:')) {
-        console.log('Cached URL is base64 (valid), using cached photo');
+      } else if (cached.url.startsWith("data:")) {
         userLogo = cached.url;
         cachedPhotoUrl = cached.url;
         cacheKey = newCacheKey;
-        console.log('Profile photo loaded from cache (persists until logout)');
+        console.log("Profile photo loaded from cache (persists until logout)");
         return;
       } else {
-        console.log('Unknown cached URL format:', cached.url.substring(0, 50));
-        // Remove unknown format cache
         localStorage.removeItem(newCacheKey);
       }
     } else {
-      console.log('No cached photo found for key:', newCacheKey);
+      console.log("No cached photo found for key:", newCacheKey);
     }
-    
-    // Not in cache, fetch from API
+
+    // ⬇️⬇️ MODIFIKASI DI SINI: suntik cache-buster via argumen userId
     try {
-      console.log('Fetching profile photo from API for userId:', userId);
-      const blobUrl = await userService.getUserProfilePhotoUrl(userId);
-      
+      console.log("Fetching profile photo from API for userId:", userId);
+
+      // buat userId dengan query param versi + timestamp (double cache-buster)
+      const userIdWithQs = `${userId}?v=${encodeURIComponent(version)}&_=${Date.now()}`;
+
+      const blobUrl = await userService.getUserProfilePhotoUrl(
+        userIdWithQs as unknown as number
+      );
+      // catatan: signature menerima string | number, di sini aman dipaksa cast.
+
       if (blobUrl) {
-        console.log('API returned blob URL, converting to base64...');
-        
-        // Convert blob URL to base64 for persistent storage
+        console.log("API returned blob URL, converting to base64...");
+
         try {
-          const response = await fetch(blobUrl);
+          const response = await fetch(blobUrl, { cache: "no-store" }); // tambah no-store di fetch lokal
           const blob = await response.blob();
-          
-          // Convert blob to base64
+
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
-          
-          // Cache the base64 string (will persist after refresh)
+
           setCachedPhoto(newCacheKey, base64);
           userLogo = base64;
           cachedPhotoUrl = base64;
           cacheKey = newCacheKey;
-          
-          // Clean up the temporary blob URL
+
           userService.revokeProfilePhotoUrl(blobUrl);
-          
-          console.log('✅ Profile photo fetched and cached as base64');
+          console.log("✅ Profile photo fetched and cached as base64");
         } catch (conversionError) {
-          console.error('❌ Failed to convert blob to base64:', conversionError);
-          // Fallback to blob URL (won't persist after refresh)
+          console.error(
+            "❌ Failed to convert blob to base64:",
+            conversionError
+          );
           userLogo = blobUrl;
           cachedPhotoUrl = null;
           cacheKey = null;
         }
       } else {
-        console.log('No profile photo available from API');
+        console.log("No profile photo available from API");
         userLogo = null;
         cachedPhotoUrl = null;
         cacheKey = null;
       }
     } catch (photoError) {
-      console.error('❌ Failed to load profile photo from API:', photoError);
+      console.error("❌ Failed to load profile photo from API:", photoError);
       userLogo = null;
       cachedPhotoUrl = null;
       cacheKey = null;
@@ -534,7 +652,12 @@
       <!-- User Info & Actions -->
       <div class="flex items-center space-x-3 min-w-0">
         <div class="text-right min-w-0 flex-shrink">
-          <p class="text-sm font-medium text-gray-700 truncate" title="Welcome, {userName}">Welcome, {userName}</p>
+          <p
+            class="text-sm font-medium text-gray-700 truncate"
+            title="Welcome, {userName}"
+          >
+            Welcome, {userName}
+          </p>
           <p class="text-xs text-gray-500">{currentTime}</p>
         </div>
 
@@ -543,39 +666,45 @@
           <!-- User Avatar Button -->
           <button
             onclick={toggleProfileDropdown}
-            class="w-12 h-12 rounded-full flex items-center justify-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 {userLogo ? '' : 'bg-blue-500 hover:bg-blue-600'}"
+            class="w-12 h-12 rounded-full flex items-center justify-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 {userLogo
+              ? ''
+              : 'bg-blue-500 hover:bg-blue-600'}"
             title="Profile menu"
           >
             {#if userLogo}
-              <img 
-                src={userLogo} 
-                alt="Profile" 
-                class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
-                onerror={(e) => {
-                  console.log('Image failed to load, clearing cache and falling back to initial');
-                  // Clear the failed cache
-                  if (cacheKey) {
-                    localStorage.removeItem(cacheKey);
-                  }
-                  // Reset logo state
-                  userLogo = null;
-                  cachedPhotoUrl = null;
-                  cacheKey = null;
-                  // Fallback to initial
-                  const img = e.currentTarget as HTMLImageElement;
-                  const fallback = img.nextElementSibling as HTMLElement;
-                  img.style.display = 'none';
-                  if (fallback) {
-                    fallback.style.display = 'flex';
-                  }
-                }}
-              />
-              <!-- Fallback initial (hidden by default) -->
-              <span class="hidden w-12 h-12 bg-blue-500 rounded-full items-center justify-center text-white text-base font-medium">
+              {#key cacheKey}
+                <img
+                  src={userLogo}
+                  alt="Profile"
+                  class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
+                  onerror={(e) => {
+                    console.log(
+                      "Image failed to load, clearing cache and falling back to initial"
+                    );
+                    if (cacheKey) {
+                      localStorage.removeItem(cacheKey);
+                    }
+                    userLogo = null;
+                    cachedPhotoUrl = null;
+                    cacheKey = null;
+
+                    const img = e.currentTarget as HTMLImageElement;
+                    const fallback = img.nextElementSibling as HTMLElement;
+                    img.style.display = "none";
+                    if (fallback) {
+                      fallback.style.display = "flex";
+                    }
+                  }}
+                />
+              {/key}
+              <span
+                class="hidden w-12 h-12 bg-blue-500 rounded-full items-center justify-center text-white text-base font-medium"
+              >
                 {userInitial}
               </span>
             {:else}
-              <span class="text-white text-base font-medium">{userInitial}</span>
+              <span class="text-white text-base font-medium">{userInitial}</span
+              >
             {/if}
           </button>
 
@@ -587,13 +716,20 @@
               <div class="py-1">
                 <!-- Profile Info -->
                 <div class="px-4 py-2 border-b border-gray-100">
-                  <p class="text-sm font-medium text-gray-900 truncate" title={userName}>{userName}</p>
+                  <p
+                    class="text-sm font-medium text-gray-900 truncate"
+                    title={userName}
+                  >
+                    {userName}
+                  </p>
                   <p class="text-xs text-gray-500">User Profile</p>
                 </div>
 
                 <!-- Profile Actions -->
                 <!-- Change Password - Only for Admin (role_id = 1) -->
-                {#if userRoleId === 1 || (userRoleId === null && userName.toLowerCase().includes('admin'))}
+                {#if userRoleId === 1 || (userRoleId === null && userName
+                      .toLowerCase()
+                      .includes("admin"))}
                   <button
                     onclick={openChangePasswordModal}
                     class="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
@@ -745,7 +881,6 @@
               required
             />
           </div>
-
         </div>
 
         <div class="flex justify-end space-x-3 mt-6">
