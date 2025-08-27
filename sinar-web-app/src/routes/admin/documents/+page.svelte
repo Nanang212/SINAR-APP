@@ -68,6 +68,8 @@
 
   function handleFormSubmit(data: FormData) {
     console.log('Form submitted:', data);
+    // Auto-switch to browse tab after successful submission
+    activeTab = "browse";
     // Refresh document table after successful submit
     if (documentTableRef) {
       documentTableRef.loadDocuments();

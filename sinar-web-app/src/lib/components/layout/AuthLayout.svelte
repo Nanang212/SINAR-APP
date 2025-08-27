@@ -34,107 +34,79 @@
 </script>
 
 <div class="min-h-screen flex">
-  <!-- Left Side - Form (Now Full Screen) -->
+  <!-- Light Background with Subtle Patterns -->
   <div
     bind:this={leftSide}
-    class="w-full flex items-center justify-center p-8 relative overflow-hidden"
-    style="background-color: #1C3752;"
+    class="w-full flex items-center justify-center p-8 relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100"
   >
-    <!-- Dark overlay with hole effect -->
+    <!-- Light overlay with gentle glow effect -->
     <div 
       class="absolute inset-0 pointer-events-none transition-all duration-75 ease-linear"
       style="
         background: radial-gradient(
-          circle 400px at {mouseX}px {mouseY}px,
-          transparent 0%,
-          transparent 30%, 
-          rgba(0, 0, 0, 0.3) 70%,
-          rgba(0, 0, 0, 0.5) 100%
+          circle 500px at {mouseX}px {mouseY}px,
+          rgba(147, 197, 253, 0.1) 0%,
+          rgba(196, 231, 255, 0.05) 30%, 
+          transparent 60%
         );
       "
     ></div>
 
-    <!-- Mouse Following Light Gradients -->
+    <!-- Mouse Following Light Gradients - Softer Colors -->
     <!-- Main gradient -->
     <div
       class="absolute pointer-events-none transition-all duration-75 ease-linear"
       style="
-        left: {mouseX - 150}px; 
-        top: {mouseY - 150}px;
-        width: 300px; 
-        height: 300px;
-        background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(99, 102, 241, 0.2) 30%, transparent 70%);
+        left: {mouseX - 200}px; 
+        top: {mouseY - 200}px;
+        width: 400px; 
+        height: 400px;
+        background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.04) 40%, transparent 70%);
         border-radius: 50%;
-        filter: blur(40px);
+        filter: blur(60px);
       "
     ></div>
 
-    <!-- Secondary smaller gradient -->
+    <!-- Secondary gradient -->
     <div
       class="absolute pointer-events-none transition-all duration-100 ease-linear"
       style="
-        left: {mouseX - 75}px; 
-        top: {mouseY - 75}px;
-        width: 150px; 
-        height: 150px;
-        background: radial-gradient(circle, rgba(147, 197, 253, 0.35) 0%, rgba(129, 140, 248, 0.2) 50%, transparent 70%);
+        left: {mouseX - 100}px; 
+        top: {mouseY - 100}px;
+        width: 200px; 
+        height: 200px;
+        background: radial-gradient(circle, rgba(147, 197, 253, 0.12) 0%, rgba(129, 140, 248, 0.06) 50%, transparent 70%);
         border-radius: 50%;
-        filter: blur(20px);
+        filter: blur(30px);
       "
     ></div>
 
-    <!-- Inner bright spot -->
-    <div
-      class="absolute pointer-events-none transition-all duration-50 ease-linear"
-      style="
-        left: {mouseX - 25}px; 
-        top: {mouseY - 25}px;
-        width: 50px; 
-        height: 50px;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
-        border-radius: 50%;
-        filter: blur(10px);
-      "
-    ></div>
-    <!-- Animated Background Shapes -->
+    <!-- Animated Background Shapes - Light Colors -->
     <div class="absolute inset-0 pointer-events-none">
-      <!-- Circle 1 -->
-      <div
-        class="absolute top-20 left-10 w-20 h-20 bg-blue-400 opacity-20 rounded-full float-1"
-      ></div>
+      <!-- Sun icon at top -->
+      <div class="absolute top-16 left-16">
+        <div class="relative">
+          <div class="w-16 h-16 bg-gradient-to-br from-yellow-300 to-orange-300 rounded-full opacity-60 float-1"></div>
+          <div class="absolute inset-2 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-full opacity-80"></div>
+          <!-- Sun rays -->
+          <div class="absolute -inset-4">
+            <div class="w-1 h-4 bg-yellow-300 opacity-40 absolute top-0 left-1/2 transform -translate-x-1/2"></div>
+            <div class="w-1 h-4 bg-yellow-300 opacity-40 absolute bottom-0 left-1/2 transform -translate-x-1/2"></div>
+            <div class="w-4 h-1 bg-yellow-300 opacity-40 absolute top-1/2 left-0 transform -translate-y-1/2"></div>
+            <div class="w-4 h-1 bg-yellow-300 opacity-40 absolute top-1/2 right-0 transform -translate-y-1/2"></div>
+          </div>
+        </div>
+      </div>
 
-      <!-- Triangle 2 -->
-      <div
-        class="absolute top-40 right-16 w-0 h-0 border-l-[15px] border-r-[15px] border-b-[25px] border-l-transparent border-r-transparent border-b-cyan-400 opacity-30 float-2"
-      ></div>
-
-      <!-- Circle 3 -->
-      <div
-        class="absolute bottom-32 left-20 w-12 h-12 bg-indigo-400 opacity-25 rounded-full float-3"
-      ></div>
-
-      <!-- Square 4 -->
-      <div
-        class="absolute top-1/3 right-10 w-16 h-16 bg-teal-400 opacity-20 rounded-lg transform rotate-45 float-4"
-      ></div>
-
-      <!-- Circle 5 -->
-      <div
-        class="absolute bottom-20 right-24 w-8 h-8 bg-sky-400 opacity-35 rounded-full float-5"
-      ></div>
-
-      <!-- Large Circle Background -->
-      <div
-        class="absolute top-10 right-4 w-32 h-32 bg-slate-300 opacity-10 rounded-full float-1"
-      ></div>
-
-      <!-- Lines -->
-      <div
-        class="absolute top-1/2 left-4 w-24 h-1 bg-gradient-to-r from-blue-400 to-transparent opacity-25 float-2"
-      ></div>
-      <div
-        class="absolute bottom-1/3 right-8 w-20 h-1 bg-gradient-to-l from-cyan-400 to-transparent opacity-30 float-3"
-      ></div>
+      <!-- Soft floating shapes -->
+      <div class="absolute top-32 right-20 w-12 h-12 bg-blue-200 opacity-30 rounded-full float-1"></div>
+      <div class="absolute top-1/2 left-12 w-8 h-8 bg-indigo-200 opacity-40 rounded-full float-2"></div>
+      <div class="absolute bottom-32 right-16 w-16 h-16 bg-sky-200 opacity-25 rounded-lg transform rotate-12 float-3"></div>
+      <div class="absolute bottom-20 left-20 w-6 h-6 bg-cyan-200 opacity-50 rounded-full float-4"></div>
+      
+      <!-- Subtle geometric patterns -->
+      <div class="absolute top-1/3 right-8 w-20 h-20 border-2 border-blue-200 opacity-20 rounded-full float-2"></div>
+      <div class="absolute bottom-1/3 left-8 w-14 h-14 border-2 border-indigo-200 opacity-25 rounded-lg transform rotate-45 float-5"></div>
     </div>
 
     <!-- Form Content -->

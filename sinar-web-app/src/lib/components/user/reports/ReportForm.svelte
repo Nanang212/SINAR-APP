@@ -72,9 +72,9 @@
 
   // Form states for adding media
   let selectedFile = $state<File | null>(null);
-  let urlInput = $state("http://");
-  let textInput = $state(""); // renamed from noteInput, now for notes content
-
+  let urlInput = $state('');
+  let textInput = $state(''); // renamed from noteInput, now for notes content
+  
   // Temporary URL list for multiple URL selection
   let tempUrlList = $state<string[]>([]);
 
@@ -935,8 +935,8 @@
     showMediaForm = false;
     currentMediaType = null;
     selectedFile = null;
-    urlInput = "http://";
-    textInput = "";
+    urlInput = '';
+    textInput = '';
     tempUrlList = [];
     showCancelOperationModal = false;
     itemToCancel = null;
@@ -976,8 +976,8 @@
 
     // Reset form
     selectedFile = null;
-    urlInput = "http://";
-    textInput = "";
+    urlInput = '';
+    textInput = '';
   }
 
   function handleEditFileSelect(event: Event) {
@@ -1113,8 +1113,8 @@
     showMediaForm = false;
     currentMediaType = null;
     selectedFile = null;
-    urlInput = "http://";
-    textInput = "";
+    urlInput = '';
+    textInput = '';
   }
 
   function removeMediaItem(id: string) {
@@ -1136,7 +1136,7 @@
     }
 
     tempUrlList = [...tempUrlList, trimmedUrl];
-    urlInput = "http://"; // Reset input
+    urlInput = ''; // Reset input
   }
 
   function removeUrlFromTempList(index: number) {
@@ -1179,7 +1179,7 @@
 
     // Reset temp list and close modal
     tempUrlList = [];
-    urlInput = "http://";
+    urlInput = '';
     showMediaForm = false;
     currentMediaType = null;
   }
@@ -1188,8 +1188,8 @@
     showMediaForm = false;
     currentMediaType = null;
     selectedFile = null;
-    urlInput = "http://";
-    textInput = "";
+    urlInput = '';
+    textInput = '';
     tempUrlList = [];
   }
 
@@ -1200,8 +1200,8 @@
     editingItem = { ...item };
 
     // Set up editing form values based on item type
-    if (item.type === "url") {
-      urlInput = item.url || "http://";
+    if (item.type === 'url') {
+      urlInput = item.url || '';
       tempUrlList = [];
     } else if (item.type === "notes") {
       textInput = item.text || "";
@@ -1278,8 +1278,8 @@
     editingItem = null;
     currentMediaType = null;
     selectedFile = null;
-    urlInput = "http://";
-    textInput = "";
+    urlInput = '';
+    textInput = '';
   }
 
   function cancelEditItem() {
@@ -1287,8 +1287,8 @@
     editingItem = null;
     currentMediaType = null;
     selectedFile = null;
-    urlInput = "http://";
-    textInput = "";
+    urlInput = '';
+    textInput = '';
   }
 
   // Helper function to find original item data from editModeData
@@ -2416,19 +2416,10 @@
                   <button
                     type="button"
                     onclick={addAllUrlsToMainList}
-                    disabled={tempUrlList.length === 0 &&
-                      (urlInput.trim() === "" ||
-                        urlInput.trim() === "http://" ||
-                        urlInput.trim() === "https://")}
+                    disabled={tempUrlList.length === 0 && urlInput.trim() === ''}
                     class="px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed rounded-md transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
                   >
-                    Add Links ({tempUrlList.length +
-                      (urlInput.trim() &&
-                      urlInput.trim() !== "http://" &&
-                      urlInput.trim() !== "https://" &&
-                      !tempUrlList.includes(urlInput.trim())
-                        ? 1
-                        : 0)})
+                    Add Links ({tempUrlList.length + ((urlInput.trim() && !tempUrlList.includes(urlInput.trim())) ? 1 : 0)})
                   </button>
                 </div>
               {:else if currentMediaType === "notes"}

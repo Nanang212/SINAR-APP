@@ -88,7 +88,10 @@
   }
 
   // Get icon color based on file extension
-  function getIconColor(filename: string): string {
+  function getIconColor(filename: string | null | undefined): string {
+    if (!filename || typeof filename !== 'string') {
+      return "text-gray-500";
+    }
     const extension = filename.split(".").pop()?.toLowerCase();
     switch (extension) {
       case "pdf":
@@ -373,7 +376,10 @@
   }
 
   // Check if document can be previewed
-  function canPreview(fileName: string): boolean {
+  function canPreview(fileName: string | null | undefined): boolean {
+    if (!fileName || typeof fileName !== 'string') {
+      return false;
+    }
     const name = fileName.toLowerCase();
     return name.endsWith('.doc') || name.endsWith('.docx');
   }
@@ -515,27 +521,24 @@
     <!-- Data Table -->
     <div class="flex-1 pr-0 sm:pr-4 overflow-auto">
       <div class="mt-16 sm:mt-8">
-        <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
+        <!-- Desktop Table (hidden on mobile/tablet) -->
+        <table class="hidden lg:table w-full table-fixed divide-y divide-gray-200 border border-gray-200">
           <thead class="bg-gray-50 sticky top-12 sm:-top-1 z-10">
             <tr>
               <!-- Document Column -->
-              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[250px] sm:min-w-[200px]">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-2/5">
                 Document
               </th>
-              <!-- Uploaded By Column (Hidden on mobile) -->
-              <th class="hidden md:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[150px] sm:min-w-[120px]">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/5">
                 Uploaded By
               </th>
-              <!-- Downloaded Status Column (Hidden on small screens) -->
-              <th class="hidden lg:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[130px] sm:min-w-[100px]">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/6">
                 Status
               </th>
-              <!-- Upload Date Column (Hidden on small screens) -->
-              <th class="hidden sm:table-cell px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/6">
                 Upload Date
               </th>
-              <!-- Actions Column -->
-              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[130px] sm:min-w-[90px]">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-1/12">
                 Actions
               </th>
             </tr>
@@ -551,11 +554,11 @@
                       <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
                     </svg>
                     <div class="min-w-0 flex-1">
-                      <div class="text-sm font-medium text-gray-900 truncate" title={doc.title}>
-                        {doc.title.length > 60 ? doc.title.substring(0, 60) + '...' : doc.title}
+                      <div class="text-sm font-medium text-gray-900 break-words" title={doc.title}>
+                        {doc.title}
                       </div>
-                      <div class="text-xs sm:text-sm text-gray-500 truncate" title={doc.original_name}>
-                        {doc.original_name.length > 45 ? doc.original_name.substring(0, 45) + '...' : doc.original_name}
+                      <div class="text-xs sm:text-sm text-gray-500 break-words" title={doc.original_name}>
+                        {doc.original_name}
                       </div>
                       <!-- Mobile: Show upload info -->
                       <div class="md:hidden text-xs text-gray-400 mt-1">
@@ -587,50 +590,52 @@
                   </div>
                 </td>
                 <!-- Actions Cell -->
-                <td class="px-3 sm:px-6 py-4 text-sm font-medium">
-                  <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
+                <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
+                  <div class="flex items-center justify-center space-x-1" onclick={(e) => e.stopPropagation()}>
                     <!-- Detail Button -->
                     <div class="relative group">
                       <button
                         onclick={() => handleDetail(doc)}
-                        class="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-                        aria-label="View document details and reports"
+                        class="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
+                        aria-label="View details"
                       >
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </button>
-                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
                         Detail
                       </div>
                     </div>
 
-                    <!-- Divider -->
-                    <div class="h-6 w-px bg-gray-300"></div>
-
                     <!-- Download Button -->
                     <div class="relative group">
-                      <button onclick={() => handleDownload(doc)} class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors" aria-label="Download document">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <button 
+                        onclick={() => handleDownload(doc)} 
+                        class="text-green-600 hover:text-green-800 p-2 rounded-md hover:bg-green-50 transition-colors" 
+                        aria-label="Download document"
+                      >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m5-7V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-1" />
                         </svg>
                       </button>
-                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
                         Download
                       </div>
                     </div>
 
-                    <!-- Divider -->
-                    <div class="h-6 w-px bg-gray-300"></div>
-
                     <!-- Delete Button -->
                     <div class="relative group">
-                      <button class="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors" onclick={() => handleDelete(doc)} aria-label="Delete document">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <button 
+                        onclick={() => handleDelete(doc)} 
+                        class="text-red-600 hover:text-red-800 p-2 rounded-md hover:bg-red-50 transition-colors" 
+                        aria-label="Delete document"
+                      >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
-                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
                         Delete
                       </div>
                     </div>
@@ -640,6 +645,85 @@
             {/each}
           </tbody>
         </table>
+        
+        <!-- Mobile/Tablet Card Layout (visible on mobile/tablet) -->
+        <div class="lg:hidden space-y-4">
+          {#each documents as doc (doc.id)}
+            <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick={() => handleRowClick(doc)}>
+              <!-- Document Header -->
+              <div class="flex items-start space-x-3 mb-3">
+                <svg class="h-8 w-8 {doc.iconColor} mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 2v10H4V5h12z" clip-rule="evenodd" />
+                  <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
+                </svg>
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-sm font-medium text-gray-900 break-words" title={doc.title}>
+                    {doc.title}
+                  </h3>
+                  <p class="text-xs text-gray-500 break-words mt-1" title={doc.original_name}>
+                    {doc.original_name}
+                  </p>
+                </div>
+                <!-- Mobile Action Buttons -->
+                <div class="flex-shrink-0 flex items-center space-x-2" onclick={(e) => e.stopPropagation()}>
+                  <!-- Preview Button -->
+                  {#if canPreview(doc.original_name)}
+                    <button
+                      onclick={() => handlePreview(doc)}
+                      disabled={isLoadingPreview}
+                      class="text-green-600 hover:text-green-800 p-2 rounded-md hover:bg-green-50 transition-colors disabled:opacity-50"
+                      aria-label="Preview document"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </button>
+                  {/if}
+                  <!-- Detail Button -->
+                  <button
+                    onclick={() => handleDetail(doc)}
+                    class="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
+                    aria-label="View details"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  <!-- Delete Button -->
+                  <button
+                    onclick={() => handleDelete(doc)}
+                    class="text-red-600 hover:text-red-800 p-2 rounded-md hover:bg-red-50 transition-colors"
+                    aria-label="Delete document"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Document Info -->
+              <div class="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                <div>
+                  <span class="font-medium">Uploaded by:</span> {doc.username_upload}
+                </div>
+                <div>
+                  <span class="font-medium">Date:</span> {formatDate(doc.uploaded_at).split(' ')[0]}
+                </div>
+                <div>
+                  <span class="font-medium">Status:</span>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {doc.isReport ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                    {doc.isReport ? 'Reported' : 'Not Reported'}
+                  </span>
+                </div>
+                <div>
+                  <span class="font-medium">Downloads:</span> {doc.downloadCount}
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
       </div>
     </div>
 

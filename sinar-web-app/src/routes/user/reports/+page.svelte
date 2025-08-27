@@ -73,6 +73,12 @@
 
   function handleFormSubmit(data: FormData) {
     console.log('Report form submitted:', data);
+    // Auto-switch to browse tab after successful submission
+    activeTab = "browse";
+    // Refresh the table data
+    if (reportTableRef) {
+      reportTableRef.loadReports();
+    }
   }
 
   function handleFormReset() {

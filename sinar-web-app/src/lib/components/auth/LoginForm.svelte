@@ -61,24 +61,19 @@
 <div
   class="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] h-[90vh] sm:h-[85vh] md:h-[80vh] lg:h-[75vh]"
 >
-  <!-- Glassmorphism Card Container -->
+  <!-- Light Theme Card Container -->
   <div class="relative h-full">
-    <!-- Main Card with Optimal Glassmorphism -->
+    <!-- Clean White Card with Soft Shadow -->
     <div
-      class="relative bg-white/5 backdrop-blur-xl border border-white/30 rounded-3xl px-4 py-6 sm:px-8 sm:py-8 md:px-12 md:py-10 lg:px-16 lg:py-12 overflow-hidden h-full"
-      style="background-color: rgba(242, 233, 221, 0.22); box-shadow:
-        inset 0 1px 0 0 rgba(255,255,255,0.3),
-        inset 0 -1px 0 0 rgba(255,255,255,0.1),
-        0 20px 40px rgba(0,0,0,0.2),
-        0 8px 16px rgba(0,0,0,0.1);"
+      class="relative bg-white rounded-3xl px-4 py-6 sm:px-8 sm:py-8 md:px-12 md:py-10 lg:px-16 lg:py-12 overflow-hidden h-full shadow-xl"
+      style="box-shadow: 0 25px 50px rgba(59, 130, 246, 0.15), 0 15px 35px rgba(99, 102, 241, 0.08);"
     >
-      <!-- Optimal Glass Shine Effects -->
-      <div
-        class="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-3xl"
-      ></div>
-      <div
-        class="absolute top-4 left-4 w-20 h-20 bg-white/20 rounded-full blur-2xl"
-      ></div>
+      <!-- Subtle top accent -->
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 rounded-t-3xl"></div>
+      
+      <!-- Gentle glow effects -->
+      <div class="absolute top-4 right-4 w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full opacity-60 blur-xl"></div>
+      <div class="absolute bottom-6 left-6 w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full opacity-40 blur-lg"></div>
 
       <!-- Split Content: Responsive Layout -->
       <div
@@ -111,16 +106,15 @@
         <div
           class="flex-1 lg:flex-[4] w-full lg:min-w-80 p-4 lg:p-8 h-auto lg:h-full flex flex-col justify-center"
         >
-          <!-- Header Inside Glass Card -->
+          <!-- Header Inside Card -->
           <div class="mb-6 lg:mb-8">
             <h1
-              class="text-2xl sm:text-3xl font-bold mb-2 lg:mb-3 tracking-tight drop-shadow-lg"
-              style="color: #173242;"
+              class="text-2xl sm:text-3xl font-bold mb-2 lg:mb-3 tracking-tight text-gray-800"
             >
               Welcome back
             </h1>
             <p
-              class="text-white/80 font-medium text-sm sm:text-base drop-shadow-sm"
+              class="text-gray-600 font-medium text-sm sm:text-base"
             >
               Login to your account
             </p>
@@ -128,8 +122,8 @@
 
           <!-- Error Message -->
           {#if errorMessage}
-            <div class="mb-4 p-3 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-lg">
-              <p class="text-red-200 text-sm text-center">{errorMessage}</p>
+            <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p class="text-red-600 text-sm text-center">{errorMessage}</p>
             </div>
           {/if}
 
@@ -139,7 +133,7 @@
             <div>
               <label
                 for="username"
-                class="block text-sm font-medium text-white/90 mb-2 drop-shadow-sm"
+                class="block text-sm font-medium text-gray-700 mb-2"
                 >Username</label
               >
               <input
@@ -147,7 +141,7 @@
                 type="text"
                 bind:value={username}
                 oninput={clearErrorOnInput}
-                class="w-full px-4 py-4 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-gray-800 placeholder-gray-500"
+                class="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200 text-gray-900 placeholder-gray-400"
                 placeholder="Enter your username"
                 required
               />
@@ -157,7 +151,7 @@
             <div>
               <label
                 for="password"
-                class="block text-sm font-medium text-white/90 mb-2 drop-shadow-sm"
+                class="block text-sm font-medium text-gray-700 mb-2"
                 >Password</label
               >
               <div class="relative">
@@ -166,14 +160,14 @@
                   type={showPassword ? "text" : "password"}
                   bind:value={password}
                   oninput={clearErrorOnInput}
-                  class="w-full px-4 py-4 pr-12 bg-white/17 backdrop-blur-sm border border-white/43 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/62 focus:border-white/62 focus:bg-white/26 transition-all duration-200 text-gray-800 placeholder-gray-500"
+                  class="w-full px-4 py-4 pr-12 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200 text-gray-900 placeholder-gray-400"
                   placeholder="Enter your password"
                   required
                 />
                 <button
                   type="button"
                   onclick={() => showPassword = !showPassword}
-                  class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800 focus:outline-none transition-colors duration-200"
+                  class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors duration-200"
                 >
                   {#if showPassword}
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -194,7 +188,7 @@
               <button
                 type="submit"
                 disabled={isLoading}
-                class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-4 rounded-xl font-medium hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 relative overflow-hidden group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-4 rounded-xl font-medium hover:from-blue-600 hover:to-indigo-700 focus:ring-4 focus:ring-blue-200 transition-all duration-200 relative overflow-hidden group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {#if isLoading}
                   <span class="relative z-10 flex items-center justify-center">

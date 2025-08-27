@@ -417,188 +417,181 @@
     <!-- Data Table -->
     <div class="flex-1 pr-0 sm:pr-4 overflow-auto">
       <div class="mt-16 sm:mt-8">
-        <table
-          class="min-w-full divide-y divide-gray-200 border border-gray-200"
-        >
-          <thead class="bg-gray-50 sticky top-12 sm:-top-1 z-10">
-            <tr>
-              <th
-                class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[220px] sm:min-w-[180px]"
-              >
-                Document
-              </th>
-              <th
-                class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[200px] sm:min-w-[180px]"
-              >
-                Description
-              </th>
-              <th
-                class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[200px] sm:min-w-[160px]"
-              >
-                Content Report
-              </th>
-              <th
-                class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 min-w-[170px] sm:min-w-[140px]"
-              >
-                Latest Report
-              </th>
-              <th
-                class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[130px] sm:min-w-[90px]"
-              >
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            {#if paginatedData().length === 0 && !isLoading}
-              <!-- Empty State Row -->
-              <tr>
-                <td colspan="5" class="px-6 py-16 text-center">
-                  <svg
-                    class="mx-auto h-12 w-12 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+      
+      <!-- Desktop Table (hidden on mobile/tablet) -->
+      <table class="hidden lg:table w-full table-fixed divide-y divide-gray-200 border border-gray-200">
+      <thead class="bg-gray-50 sticky top-12 sm:-top-1 z-10">
+        <tr>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/4">
+            Document
+          </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/4">
+            Description
+          </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/4">
+            Content Report
+          </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/6">
+            Latest Report
+          </th>
+          <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-1/12">
+            Actions
+          </th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        {#if paginatedData().length === 0 && !isLoading}
+          <!-- Empty State Row -->
+          <tr>
+            <td colspan="5" class="px-6 py-16 text-center">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 class="mt-2 text-sm font-medium text-gray-900">No reports found</h3>
+              <p class="mt-1 text-sm text-gray-500">No reports available on this page.</p>
+            </td>
+          </tr>
+        {:else}
+          {#each paginatedData() as document (document.id)}
+            <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-200" onclick={() => handleRowClick(document)}>
+              <!-- Document Column -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
+              <div class="flex items-center">
+                <svg class="h-6 w-6 sm:h-8 sm:w-8 {document.iconColor} mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 2v10H4V5h12z" clip-rule="evenodd" />
+                  <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
+                </svg>
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium text-gray-900 break-words" title={document.document_original_name}>
+                    {document.document_original_name}
+                  </div>
+                </div>
+              </div>
+            </td>
+            
+            <!-- Description Column -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
+              <div class="text-sm text-gray-900">
+                {#if document.description && document.description !== '-'}
+                  <span class="break-words" title={document.description}>{document.description}</span>
+                {:else}
+                  <span class="text-gray-400 italic">No description</span>
+                {/if}
+              </div>
+            </td>
+            
+            <!-- Media Content Column -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
+              <div class="flex flex-wrap gap-1">
+                {#if getMediaCountBadges(document).length > 0}
+                  {#each getMediaCountBadges(document) as badge}
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {badge.bg} {badge.color}">
+                      {badge.text}
+                    </span>
+                  {/each}
+                {:else}
+                  <span class="text-xs text-gray-500 italic">No media content</span>
+                {/if}
+              </div>
+            </td>
+            
+            <!-- Latest Report Date -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 border-r border-gray-200">
+              <div class="hidden sm:block">{document.created_at}</div>
+              <div class="sm:hidden">{document.created_at.split(' ')[0]}</div>
+            </td>
+            
+            <!-- Actions -->
+            <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
+              <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
+                <!-- View Details Button -->
+                <div class="relative group">
+                  <button
+                    onclick={() => openDetailModal(document)}
+                    class="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
+                    aria-label="View details"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <h3 class="mt-2 text-sm font-medium text-gray-900">
-                    No reports found
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                    Detail
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {/each}
+        {/if}
+      </tbody>
+      </table>
+      
+      <!-- Mobile/Tablet Card Layout (visible on mobile/tablet) -->
+      <div class="lg:hidden space-y-4">
+        {#if paginatedData().length === 0 && !isLoading}
+          <!-- Empty State -->
+          <div class="flex flex-col items-center justify-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No reports found</h3>
+            <p class="mt-1 text-sm text-gray-500">No reports available on this page.</p>
+          </div>
+        {:else}
+          {#each paginatedData() as document (document.id)}
+            <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick={() => handleRowClick(document)}>
+              <!-- Document Header -->
+              <div class="flex items-start space-x-3 mb-3">
+                <svg class="h-8 w-8 {document.iconColor} mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 2v10H4V5h12z" clip-rule="evenodd" />
+                  <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
+                </svg>
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-sm font-medium text-gray-900 break-words" title={document.document_original_name}>
+                    {document.document_original_name}
                   </h3>
-                  <p class="mt-1 text-sm text-gray-500">
-                    No reports available on this page.
+                  <p class="text-xs text-gray-500 mt-1">
+                    Latest Report: {document.created_at.split(' ')[0]}
                   </p>
-                </td>
-              </tr>
-            {:else}
-              {#each paginatedData() as document (document.id)}
-                <tr
-                  class="hover:bg-gray-50 cursor-pointer border-b border-gray-200"
-                  onclick={() => handleRowClick(document)}
-                >
-                  <!-- Document Column -->
-                  <td
-                    class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200"
+                </div>
+                <!-- Mobile Action Button -->
+                <div class="flex-shrink-0" onclick={(e) => e.stopPropagation()}>
+                  <button
+                    onclick={() => openDetailModal(document)}
+                    class="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
+                    aria-label="View details"
                   >
-                    <div class="flex items-center">
-                      <svg
-                        class="h-6 w-6 sm:h-8 sm:w-8 {document.iconColor} mr-2 sm:mr-3 flex-shrink-0"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fill-rule="evenodd"
-                          d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 2v10H4V5h12z"
-                          clip-rule="evenodd"
-                        />
-                        <path
-                          d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z"
-                        />
-                      </svg>
-                      <div class="min-w-0 flex-1">
-                        <div
-                          class="text-sm font-medium text-gray-900 truncate"
-                          title={document.document_original_name}
-                        >
-                          {document.document_original_name}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  <!-- Description Column -->
-                  <td
-                    class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200"
-                  >
-                    <div class="text-sm text-gray-900">
-                      {#if document.description && document.description !== "-"}
-                        <span class="truncate" title={document.description}
-                          >{document.description}</span
-                        >
-                      {:else}
-                        <span class="text-gray-400 italic">No description</span>
-                      {/if}
-                    </div>
-                  </td>
-
-                  <!-- Media Content Column -->
-                  <td
-                    class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200"
-                  >
-                    <div class="flex flex-wrap gap-1">
-                      {#if getMediaCountBadges(document).length > 0}
-                        {#each getMediaCountBadges(document) as badge}
-                          <span
-                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {badge.bg} {badge.color}"
-                          >
-                            {badge.text}
-                          </span>
-                        {/each}
-                      {:else}
-                        <span class="text-xs text-gray-500 italic"
-                          >No media content</span
-                        >
-                      {/if}
-                    </div>
-                  </td>
-
-                  <!-- Latest Report Date -->
-                  <td
-                    class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 border-r border-gray-200"
-                  >
-                    <div class="hidden sm:block">{document.created_at}</div>
-                    <div class="sm:hidden">
-                      {document.created_at.split(" ")[0]}
-                    </div>
-                  </td>
-
-                  <!-- Actions -->
-                  <td
-                    class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium"
-                  >
-                    <div
-                      class="flex items-center justify-center"
-                      onclick={(e) => e.stopPropagation()}
-                    >
-                      <!-- View Details Button -->
-                      <div class="relative group">
-                        <button
-                          onclick={() => openDetailModal(document)}
-                          class="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
-                          aria-label="View details"
-                        >
-                          <svg
-                            class="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </button>
-                        <div
-                          class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10"
-                        >
-                          Detail
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Description -->
+              {#if document.description && document.description !== '-'}
+                <div class="mb-3">
+                  <p class="text-sm text-gray-700 break-words">{document.description}</p>
+                </div>
+              {/if}
+              
+              <!-- Content Report Badges -->
+              <div class="flex flex-wrap gap-2">
+                {#if getMediaCountBadges(document).length > 0}
+                  {#each getMediaCountBadges(document) as badge}
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {badge.bg} {badge.color}">
+                      {badge.text}
+                    </span>
+                  {/each}
+                {:else}
+                  <span class="text-xs text-gray-500 italic">No media content</span>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        {/if}
+      </div>
       </div>
     </div>
 

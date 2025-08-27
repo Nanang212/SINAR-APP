@@ -81,6 +81,8 @@
 
   function handleFormSubmit(data: FormData) {
     console.log('Form submitted:', data);
+    // Auto-switch to browse tab after successful submission
+    activeTab = "browse";
     // Refresh user table after successful submit
     if (userTableRef) {
       userTableRef.loadUsers();
