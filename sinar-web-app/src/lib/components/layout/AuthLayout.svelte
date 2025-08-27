@@ -83,30 +83,30 @@
 
     <!-- Animated Background Shapes - Light Colors -->
     <div class="absolute inset-0 pointer-events-none">
-      <!-- Sun icon at top -->
-      <div class="absolute top-16 left-16">
+      <!-- Sun icon at top-right -->
+      <div class="absolute top-16 right-16">
         <div class="relative">
-          <div class="w-16 h-16 bg-gradient-to-br from-yellow-300 to-orange-300 rounded-full opacity-60 float-1"></div>
-          <div class="absolute inset-2 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-full opacity-80"></div>
+          <div class="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full opacity-90 float-1"></div>
+          <div class="absolute inset-2 bg-gradient-to-br from-yellow-300 to-yellow-400 rounded-full opacity-95"></div>
           <!-- Sun rays -->
           <div class="absolute -inset-4">
-            <div class="w-1 h-4 bg-yellow-300 opacity-40 absolute top-0 left-1/2 transform -translate-x-1/2"></div>
-            <div class="w-1 h-4 bg-yellow-300 opacity-40 absolute bottom-0 left-1/2 transform -translate-x-1/2"></div>
-            <div class="w-4 h-1 bg-yellow-300 opacity-40 absolute top-1/2 left-0 transform -translate-y-1/2"></div>
-            <div class="w-4 h-1 bg-yellow-300 opacity-40 absolute top-1/2 right-0 transform -translate-y-1/2"></div>
+            <div class="w-1 h-4 bg-yellow-500 opacity-70 absolute top-0 left-1/2 transform -translate-x-1/2"></div>
+            <div class="w-1 h-4 bg-yellow-500 opacity-70 absolute bottom-0 left-1/2 transform -translate-x-1/2"></div>
+            <div class="w-4 h-1 bg-yellow-500 opacity-70 absolute top-1/2 left-0 transform -translate-y-1/2"></div>
+            <div class="w-4 h-1 bg-yellow-500 opacity-70 absolute top-1/2 right-0 transform -translate-y-1/2"></div>
           </div>
         </div>
       </div>
 
       <!-- Soft floating shapes -->
-      <div class="absolute top-32 right-20 w-12 h-12 bg-blue-200 opacity-30 rounded-full float-1"></div>
-      <div class="absolute top-1/2 left-12 w-8 h-8 bg-indigo-200 opacity-40 rounded-full float-2"></div>
-      <div class="absolute bottom-32 right-16 w-16 h-16 bg-sky-200 opacity-25 rounded-lg transform rotate-12 float-3"></div>
-      <div class="absolute bottom-20 left-20 w-6 h-6 bg-cyan-200 opacity-50 rounded-full float-4"></div>
+      <div class="absolute top-32 left-20 w-12 h-12 bg-orange-300 opacity-60 rounded-full float-1"></div>
+      <div class="absolute top-1/2 left-12 w-8 h-8 bg-yellow-300 opacity-70 rounded-full float-2"></div>
+      <div class="absolute bottom-32 right-16 w-16 h-16 bg-amber-300 opacity-50 rounded-lg transform rotate-12 float-3"></div>
+      <div class="absolute bottom-20 left-20 w-6 h-6 bg-orange-400 opacity-80 rounded-full float-4"></div>
       
       <!-- Subtle geometric patterns -->
-      <div class="absolute top-1/3 right-8 w-20 h-20 border-2 border-blue-200 opacity-20 rounded-full float-2"></div>
-      <div class="absolute bottom-1/3 left-8 w-14 h-14 border-2 border-indigo-200 opacity-25 rounded-lg transform rotate-45 float-5"></div>
+      <div class="absolute top-1/3 right-8 w-20 h-20 border-2 border-yellow-400 opacity-40 rounded-full float-2"></div>
+      <div class="absolute bottom-1/3 left-8 w-14 h-14 border-2 border-orange-400 opacity-50 rounded-lg transform rotate-45 float-5"></div>
     </div>
 
     <!-- Form Content -->

@@ -526,10 +526,10 @@
           <thead class="bg-gray-50 sticky top-12 sm:-top-1 z-10">
             <tr>
               <!-- Document Column -->
-              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-2/5">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/3">
                 Document
               </th>
-              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/5">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/8">
                 Uploaded By
               </th>
               <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/6">
@@ -538,7 +538,7 @@
               <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/6">
                 Upload Date
               </th>
-              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-1/12">
+              <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-1/6">
                 Actions
               </th>
             </tr>
@@ -647,7 +647,7 @@
         </table>
         
         <!-- Mobile/Tablet Card Layout (visible on mobile/tablet) -->
-        <div class="lg:hidden space-y-4">
+        <div class="lg:hidden space-y-4 mt-6">
           {#each documents as doc (doc.id)}
             <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick={() => handleRowClick(doc)}>
               <!-- Document Header -->
@@ -666,20 +666,6 @@
                 </div>
                 <!-- Mobile Action Buttons -->
                 <div class="flex-shrink-0 flex items-center space-x-2" onclick={(e) => e.stopPropagation()}>
-                  <!-- Preview Button -->
-                  {#if canPreview(doc.original_name)}
-                    <button
-                      onclick={() => handlePreview(doc)}
-                      disabled={isLoadingPreview}
-                      class="text-green-600 hover:text-green-800 p-2 rounded-md hover:bg-green-50 transition-colors disabled:opacity-50"
-                      aria-label="Preview document"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    </button>
-                  {/if}
                   <!-- Detail Button -->
                   <button
                     onclick={() => handleDetail(doc)}
@@ -688,6 +674,16 @@
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  <!-- Download Button -->
+                  <button
+                    onclick={() => handleDownload(doc)}
+                    class="text-green-600 hover:text-green-800 p-2 rounded-md hover:bg-green-50 transition-colors"
+                    aria-label="Download document"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m5-7V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-1" />
                     </svg>
                   </button>
                   <!-- Delete Button -->
