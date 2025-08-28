@@ -29,6 +29,7 @@
     fetchOnMount?: boolean;
     onDelete?: (user: User) => void;
     onRowClick?: (user: ApiUser) => void;
+    onDetail?: (user: ApiUser) => void;
     searchTerm?: string;
     sortOrder?: 'asc' | 'desc';
   }
@@ -37,6 +38,7 @@
     fetchOnMount = false,
     onDelete,
     onRowClick,
+    onDetail,
     searchTerm = "",
     sortOrder = 'desc',
   }: $$Props = $props();
@@ -220,6 +222,13 @@
   let showDeleteModal = $state(false);
   let userToDelete = $state<User | null>(null);
   let isDeleting = $state(false);
+  
+  // Detail modal state
+  let showDetailModal = $state(false);
+  let userToShowDetail = $state<ApiUser | null>(null);
+  let showImagePreview = $state(false);
+  let previewImageUrl = $state<string>('');
+  let authorizedImageUrl = $state<string>('');
 
   function handlePageChange(newPage: number) {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -278,6 +287,74 @@
     const apiUser = apiUsers.find(apiUser => apiUser.id.toString() === user.id);
     if (apiUser && onRowClick) {
       onRowClick(apiUser);
+    }
+  }
+
+  async function handleDetail(user: User) {
+    // Find the corresponding API user
+    const apiUser = apiUsers.find(apiUser => apiUser.id.toString() === user.id);
+    if (apiUser) {
+      userToShowDetail = apiUser;
+      
+      // Load authorized image URL if user has profile picture
+      if (apiUser.logo_url || apiUser.logo || apiUser.profile_picture) {
+        try {
+          const blobUrl = await userService.getUserProfilePhotoUrl(apiUser.id);
+          if (blobUrl) {
+            authorizedImageUrl = blobUrl;
+          }
+        } catch (error) {
+          console.error('Failed to load profile image:', error);
+          authorizedImageUrl = '';
+        }
+      } else {
+        authorizedImageUrl = '';
+      }
+      
+      showDetailModal = true;
+      // Also call parent onDetail if provided
+      onDetail?.(apiUser);
+    }
+  }
+
+  function closeDetailModal() {
+    showDetailModal = false;
+    userToShowDetail = null;
+    // Clean up authorized image URL to prevent memory leaks
+    if (authorizedImageUrl) {
+      userService.revokeProfilePhotoUrl(authorizedImageUrl);
+      authorizedImageUrl = '';
+    }
+  }
+
+  function showImagePreviewModal(imageUrl: string) {
+    console.log('Opening image preview for:', imageUrl);
+    previewImageUrl = imageUrl;
+    showImagePreview = true;
+    console.log('showImagePreview state:', showImagePreview);
+    console.log('previewImageUrl state:', previewImageUrl);
+    
+    // Focus on the modal after it opens for proper keyboard navigation
+    setTimeout(() => {
+      const modal = document.querySelector('[role="dialog"][aria-label="Image preview"]') as HTMLElement;
+      if (modal) {
+        modal.focus();
+        console.log('Modal focused');
+      } else {
+        console.log('Modal not found for focus');
+      }
+    }, 100);
+  }
+
+  function closeImagePreview() {
+    showImagePreview = false;
+    previewImageUrl = '';
+  }
+
+  // Handle ESC key for image preview
+  function handleImagePreviewKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      closeImagePreview();
     }
   }
 
@@ -400,7 +477,19 @@
                 </td>
                 <!-- Actions Cell -->
                 <td class="px-3 sm:px-6 py-4 text-sm font-medium">
-                  <div class="flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
+                  <div class="flex items-center justify-center space-x-1 sm:space-x-2" onclick={(e) => e.stopPropagation()}>
+                    <!-- Detail Button -->
+                    <div class="relative group">
+                      <button class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors" onclick={() => handleDetail(user)} aria-label="View user details">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                        Detail
+                      </div>
+                    </div>
+                    
                     <!-- Delete Button -->
                     <div class="relative group">
                       <button class="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors" onclick={() => handleDelete(user)} aria-label="Delete user">
@@ -502,5 +591,261 @@
   onCancel={cancelDelete}
   isLoading={isDeleting}
 />
+
+<!-- User Detail Modal -->
+{#if showDetailModal && userToShowDetail}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4" onclick={closeDetailModal}>
+    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl" onclick={(e) => e.stopPropagation()}>
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center space-x-4">
+          {#if authorizedImageUrl}
+            <div class="relative">
+              <img 
+                src={authorizedImageUrl} 
+                alt="Profile image" 
+                role="button"
+                tabindex="0"
+                aria-label="Click to preview profile image"
+                class="h-12 w-12 object-cover rounded-full border-2 border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                onclick={() => showImagePreviewModal(authorizedImageUrl)}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    showImagePreviewModal(authorizedImageUrl);
+                  }
+                }}
+                onerror={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const nextElement = e.currentTarget.nextElementSibling;
+                  if (nextElement) nextElement.style.display = 'flex';
+                }}
+              />
+              <!-- Fallback icon in header if image fails -->
+              <div class="h-12 w-12 bg-gray-100 rounded-full border-2 border-gray-200 shadow-sm flex items-center justify-center hidden">
+                <svg class="h-6 w-6 {getIconColorForUser(userToShowDetail.username)}" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          {:else}
+            <div class="h-12 w-12 bg-gray-100 rounded-full border-2 border-gray-200 shadow-sm flex items-center justify-center">
+              <svg class="h-6 w-6 {getIconColorForUser(userToShowDetail.username)}" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+              </svg>
+            </div>
+          {/if}
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900">User Details</h2>
+            <p class="text-sm text-gray-500">{userToShowDetail.username}</p>
+          </div>
+        </div>
+        <button onclick={closeDetailModal} class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="px-6 py-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Basic Information -->
+          <div class="space-y-4">
+            <h3 class="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Basic Information</h3>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Username</label>
+              <p class="mt-1 text-sm text-gray-900">{userToShowDetail.username || '-'}</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Role</label>
+              <p class="mt-1">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {userToShowDetail.role?.name === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}">
+                  {userToShowDetail.role?.name || 'user'}
+                </span>
+              </p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Category</label>
+              <p class="mt-1 text-sm text-gray-900">{userToShowDetail.category?.name || 'No category assigned'}</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Status</label>
+              <p class="mt-1">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {userToShowDetail.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                  {userToShowDetail.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <!-- Additional Information -->
+          <div class="space-y-4">
+            <h3 class="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Additional Information</h3>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Contact Person</label>
+              <p class="mt-1 text-sm text-gray-900">{userToShowDetail.contact_person || '-'}</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Name Mentri</label>
+              <p class="mt-1 text-sm text-gray-900">{userToShowDetail.name_mentri || '-'}</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Created Date</label>
+              <p class="mt-1 text-sm text-gray-900">{formatDate(userToShowDetail.created_at)}</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-500">Last Updated</label>
+              <p class="mt-1 text-sm text-gray-900">{formatDate(userToShowDetail.updated_at || userToShowDetail.created_at)}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile Image/Logo -->
+        <div class="mt-6 pt-6 border-t border-gray-200">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Profile Image</h3>
+          <div class="flex justify-center">
+            {#if authorizedImageUrl}
+              <div class="relative group">
+                <img 
+                  src={authorizedImageUrl} 
+                  alt="Profile image" 
+                  role="button"
+                  tabindex="0"
+                  aria-label="Click to preview profile image"
+                  class="w-32 h-32 object-cover rounded-full border-4 border-gray-200 shadow-md cursor-pointer hover:shadow-lg transition-all duration-200 group-hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2"
+                  onclick={() => showImagePreviewModal(authorizedImageUrl)}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      showImagePreviewModal(authorizedImageUrl);
+                    }
+                  }}
+                  onerror={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const nextElement = e.currentTarget.nextElementSibling?.nextElementSibling;
+                    if (nextElement) nextElement.style.display = 'flex';
+                  }}
+                />
+                <!-- Hover overlay -->
+                <div 
+                  class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-full transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer" 
+                  role="button"
+                  tabindex="0"
+                  onclick={() => showImagePreviewModal(authorizedImageUrl)}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      showImagePreviewModal(authorizedImageUrl);
+                    }
+                  }}
+                  aria-label="Preview profile image"
+                >
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                  </svg>
+                </div>
+                <!-- Fallback icon if image fails to load -->
+                <div class="w-32 h-32 bg-gray-100 rounded-full border-4 border-gray-200 shadow-md items-center justify-center hidden">
+                  <svg class="w-16 h-16 {getIconColorForUser(userToShowDetail.username)}" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+            {:else}
+              <!-- Default user icon when no image is available -->
+              <div class="w-32 h-32 bg-gray-100 rounded-full border-4 border-gray-200 shadow-md flex items-center justify-center">
+                <svg class="w-16 h-16 {getIconColorForUser(userToShowDetail.username)}" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                </svg>
+              </div>
+            {/if}
+          </div>
+          
+          <!-- Image info -->
+          {#if authorizedImageUrl}
+            <div class="text-center mt-2">
+              <p class="text-xs text-gray-500">User profile image</p>
+              <p class="text-xs text-gray-400 mt-1">Click image to preview</p>
+            </div>
+          {:else}
+            <div class="text-center mt-2">
+              <p class="text-xs text-gray-500">No profile image uploaded</p>
+            </div>
+          {/if}
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div class="flex justify-end">
+          <button onclick={closeDetailModal} class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Image Preview Modal -->
+{#if showImagePreview && previewImageUrl}
+  
+  <div 
+    class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4" 
+    style="z-index: 999999;"
+    onclick={closeImagePreview}
+    onkeydown={handleImagePreviewKeydown}
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Image preview"
+  >
+    <div class="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center" onclick={(e) => e.stopPropagation()}>
+      <!-- Close button -->
+      <button 
+        onclick={closeImagePreview} 
+        class="absolute top-4 right-4 z-10 text-white hover:text-gray-300 transition-colors bg-black bg-opacity-50 rounded-full p-2"
+        aria-label="Close image preview"
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      
+      <!-- Image -->
+      <img 
+        src={previewImageUrl} 
+        alt="Profile image preview" 
+        class="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+        onclick={(e) => e.stopPropagation()}
+        onload={() => console.log('Preview image loaded successfully')}
+        onerror={(e) => console.error('Preview image failed to load:', e)}
+      />
+      
+      <!-- Image info overlay -->
+      <div class="absolute bottom-4 left-4 right-4 text-center">
+        <div class="bg-black bg-opacity-75 text-white px-4 py-2 rounded-lg inline-block">
+          <p class="text-sm">
+            {#if userToShowDetail?.username}
+              {userToShowDetail.username}'s profile image
+            {:else}
+              Profile image
+            {/if}
+          </p>
+          <p class="text-xs text-gray-300 mt-1">Click outside or press ESC to close</p>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
 
 

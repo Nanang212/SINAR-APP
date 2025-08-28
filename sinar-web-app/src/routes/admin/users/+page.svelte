@@ -81,7 +81,8 @@
 
   function handleFormSubmit(data: FormData) {
     console.log('Form submitted:', data);
-    // Auto-switch to browse tab after successful submission
+    // Clear selected user and switch to browse tab after successful submission
+    selectedUser = null;
     activeTab = "browse";
     // Refresh user table after successful submit
     if (userTableRef) {
@@ -108,6 +109,11 @@
     console.log('Row clicked:', user);
     selectedUser = user;
     activeTab = "input"; // Switch to input tab
+  }
+
+  function handleUserDetail(user: User) {
+    console.log('View user detail:', user);
+    // Detail handler - modal will be handled by UserTable component
   }
 
 </script>
@@ -153,6 +159,7 @@
             onDelete={handleUserDelete}
             onRefresh={() => console.log('Users refreshed')}
             onRowClick={handleRowClick}
+            onDetail={handleUserDetail}
             {searchTerm}
             {sortOrder}
           />

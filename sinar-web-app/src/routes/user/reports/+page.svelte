@@ -73,7 +73,8 @@
 
   function handleFormSubmit(data: FormData) {
     console.log('Report form submitted:', data);
-    // Auto-switch to browse tab after successful submission
+    // Clear selected report data and switch to browse tab after successful submission
+    selectedReportData = null;
     activeTab = "browse";
     // Refresh the table data
     if (reportTableRef) {

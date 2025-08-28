@@ -68,7 +68,8 @@
 
   function handleFormSubmit(data: FormData) {
     console.log('Form submitted:', data);
-    // Auto-switch to browse tab after successful submission
+    // Clear selected document and switch to browse tab after successful submission
+    selectedDocument = null;
     activeTab = "browse";
     // Refresh document table after successful submit
     if (documentTableRef) {
@@ -134,7 +135,7 @@
       </div>
       
       <!-- Tab Content -->
-      <div class="absolute inset-0 pt-[120px] sm:pt-[130px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
+      <div class="absolute inset-0 pt-[100px] sm:pt-[110px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
         {#if activeTab === "input"}
           <DocumentForm onSubmit={handleFormSubmit} onReset={handleFormReset} documentData={selectedDocument} />
         {:else if activeTab === "browse"}

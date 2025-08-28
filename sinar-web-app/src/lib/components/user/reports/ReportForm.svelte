@@ -431,12 +431,6 @@
       isFormDisabled = false;
       uploadProgress = { current: 0, total: 0, currentFile: "" };
     }
-
-    // Also call parent callback if provided
-    const formData = new FormData();
-    formData.append("document_id", selectedDocumentId);
-    if (description) formData.append("description", description);
-    onSubmit?.(formData);
   }
 
   async function handleMultipleContentUpload(
@@ -528,6 +522,11 @@
       modalToastStore.success(
         `All ${successCount} items uploaded successfully!`
       );
+      // Call parent onSubmit callback to refresh data and switch to browse tab
+      const formData = new FormData();
+      formData.append("document_id", documentId);
+      if (description) formData.append("description", description);
+      onSubmit?.(formData);
       // Reset form on complete success
       handleReset();
     }
@@ -912,6 +911,12 @@
         message +
           ' Form is now disabled. Click "Reset" to make new changes or select new data from browse.'
       );
+
+      // Call parent onSubmit callback to refresh data and switch to browse tab
+      const formData = new FormData();
+      formData.append("document_id", selectedDocumentId);
+      if (description) formData.append("description", description);
+      onSubmit?.(formData);
 
       // Disable form after successful update
       isUpdateCompleted = true;

@@ -103,8 +103,8 @@
         if (result.status) {
           console.log('Document updated successfully:', result.data);
           modalToastStore.success('Document updated successfully!');
-          // Refresh the document data
-          await refreshDocumentData();
+          // Call parent onSubmit callback to refresh data and switch to browse tab
+          onSubmit?.(formData);
         } else {
           console.error('Update failed:', result.message);
           modalToastStore.error(result.message || 'Failed to update document');
@@ -126,7 +126,8 @@
         if (result.status) {
           console.log('Document uploaded successfully:', result.data);
           modalToastStore.success('Document uploaded successfully!');
-          // Keep form disabled and data visible
+          // Call parent onSubmit callback to refresh data and switch to browse tab
+          onSubmit?.(formData);
         } else {
           console.error('Upload failed:', result.message);
           modalToastStore.error(result.message || 'Failed to upload document');
@@ -140,9 +141,6 @@
     } finally {
       isSubmitting = false;
     }
-
-    // Also call parent callback if provided
-    onSubmit?.(formData);
   }
 
   function handleReset() {

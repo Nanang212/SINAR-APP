@@ -254,10 +254,8 @@
         if (result.status) {
           console.log('User updated successfully:', result.data);
           modalToastStore.success('User updated successfully!');
-          // Call parent onSubmit callback if provided (after success)
+          // Call parent onSubmit callback to refresh data and switch to browse tab
           onSubmit?.();
-          // Refresh the user data
-          await refreshUserData();
         } else {
           console.error('Update failed:', result.message);
           modalToastStore.error(result.message || 'Failed to update user');
@@ -279,9 +277,8 @@
         if (result.status) {
           console.log('User created successfully:', result.data);
           modalToastStore.success('User created successfully!');
-          // For create user, don't call onSubmit to avoid tab switching
-          // Just keep form disabled and data visible for review
-          // Keep form disabled and data visible
+          // Call parent onSubmit callback to refresh data and switch to browse tab
+          onSubmit?.();
         } else {
           console.error('Create failed:', result.message);
           modalToastStore.error(result.message || 'Failed to create user');

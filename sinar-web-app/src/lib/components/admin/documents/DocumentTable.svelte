@@ -520,10 +520,10 @@
   {:else}
     <!-- Data Table -->
     <div class="flex-1 pr-0 sm:pr-4 overflow-auto">
-      <div class="mt-16 sm:mt-8">
+      <div class="mt-2 sm:mt-4">
         <!-- Desktop Table (hidden on mobile/tablet) -->
         <table class="hidden lg:table w-full table-fixed divide-y divide-gray-200 border border-gray-200">
-          <thead class="bg-gray-50 sticky top-12 sm:-top-1 z-10">
+          <thead class="bg-gray-50 sticky top-0 z-10">
             <tr>
               <!-- Document Column -->
               <th class="px-3 sm:px-4 lg:px-6 py-4 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-1/3">
