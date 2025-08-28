@@ -2,6 +2,15 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { findAllBuilder } = require("../utils/query");
 
+// Helper function to convert text to title case
+const toTitleCase = (str) => {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 // 🔍 Find All Kategori
 exports.findAllKategori = async (params) => {
   return await findAllBuilder({
@@ -48,9 +57,15 @@ exports.findKategoriById = async (id) => {
 // ➕ Create Kategori
 exports.createKategori = async ({ data, createdBy }) => {
   try {
+    // Convert name to title case if provided
+    const processedData = {
+      ...data,
+      name: data.name ? toTitleCase(data.name.trim()) : data.name,
+    };
+
     const newKategori = await prisma.kategori.create({
       data: {
-        ...data,
+        ...processedData,
         is_active: true,
         created_by: createdBy || null,
         updated_by: createdBy || null,
@@ -83,10 +98,16 @@ exports.updateKategori = async (id, data, updatedBy) => {
       };
     }
 
+    // Convert name to title case if provided
+    const processedData = {
+      ...data,
+      name: data.name ? toTitleCase(data.name.trim()) : data.name,
+    };
+
     const updated = await prisma.kategori.update({
       where: { id },
       data: {
-        ...data,
+        ...processedData,
         updated_by: updatedBy || null,
       },
     });

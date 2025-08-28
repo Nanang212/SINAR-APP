@@ -1,6 +1,15 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
+// Helper function to convert text to title case
+const toTitleCase = (str) => {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 async function main() {
   const categories = [
     "kementrian komunikasi dan digital",
@@ -13,11 +22,12 @@ async function main() {
   ];
 
   for (const name of categories) {
+    const titleCaseName = toTitleCase(name.trim());
     await prisma.kategori.upsert({
-      where: { name },
+      where: { name: titleCaseName },
       update: {},
       create: {
-        name,
+        name: titleCaseName,
         is_active: true,
         created_by: 0,
       },

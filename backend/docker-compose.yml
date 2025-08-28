@@ -5,14 +5,16 @@ services:
     image: postgres:17
     container_name: sinar_postgres
     restart: always
-    ports:
-      - "5432:5432"
+    # ❌ jangan expose ke publik
+    expose:
+      - "5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: mentri
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups  # Mount backup directory
     networks:
       - sinar_network
     healthcheck:
@@ -59,6 +61,32 @@ services:
       - .env
     networks:
       - sinar_network
+
+  # 🕐 Backup Cron Service
+  backup-cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: sinar_backup_cron
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=sinar_postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=mentri
+      - BACKUP_RETENTION_DAYS=7
+    volumes:
+      - ./backups:/backups
+      - ./logs:/var/log
+    networks:
+      - sinar_network
+    # Optional: hanya jalankan jika butuh backup otomatis
+    profiles:
+      - backup
 
 networks:
   sinar_network:

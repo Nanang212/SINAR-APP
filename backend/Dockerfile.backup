@@ -1,0 +1,66 @@
+# ===========================================
+# DOCKERFILE FOR BACKUP CRON SERVICE
+# ===========================================
+
+FROM postgres:17-alpine
+
+# Install dependencies
+RUN apk add --no-cache \
+    bash \
+    gzip \
+    curl \
+    dcron \
+    ca-certificates
+
+# Create backup user and directories
+RUN adduser -D -s /bin/bash backupuser && \
+    mkdir -p /backups /var/log/cron && \
+    chown -R backupuser:backupuser /backups /var/log/cron
+
+# Copy backup scripts
+COPY scripts/docker-backup.sh /usr/local/bin/backup.sh
+COPY scripts/docker-restore.sh /usr/local/bin/restore.sh
+
+# Make scripts executable
+RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore.sh
+
+# Create cron job file
+RUN echo "# SINAR Database Backup - Daily at midnight" > /var/spool/cron/crontabs/root && \
+    echo "0 0 * * * /usr/local/bin/backup.sh >> /var/log/sinar-backup.log 2>&1" >> /var/spool/cron/crontabs/root && \
+    chmod 0600 /var/spool/cron/crontabs/root
+
+# Create entrypoint script
+RUN echo '#!/bin/bash' > /entrypoint.sh && \
+    echo 'echo "🚀 Starting SINAR Backup Cron Service..."' >> /entrypoint.sh && \
+    echo 'echo "📅 Backup Schedule: Daily at 00:00 UTC"' >> /entrypoint.sh && \
+    echo 'echo "📁 Backup Directory: /backups"' >> /entrypoint.sh && \
+    echo 'echo "🗄️  Database: $POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB"' >> /entrypoint.sh && \
+    echo 'echo "📝 Logs: /var/log/sinar-backup.log"' >> /entrypoint.sh && \
+    echo 'echo ""' >> /entrypoint.sh && \
+    echo '# Test database connection' >> /entrypoint.sh && \
+    echo 'until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER; do' >> /entrypoint.sh && \
+    echo '  echo "⏳ Waiting for PostgreSQL to be ready..."' >> /entrypoint.sh && \
+    echo '  sleep 2' >> /entrypoint.sh && \
+    echo 'done' >> /entrypoint.sh && \
+    echo 'echo "✅ PostgreSQL is ready!"' >> /entrypoint.sh && \
+    echo 'echo ""' >> /entrypoint.sh && \
+    echo '# Start cron daemon' >> /entrypoint.sh && \
+    echo 'echo "🕐 Starting cron daemon..."' >> /entrypoint.sh && \
+    echo 'crond -f -l 2' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD ps aux | grep -v grep | grep -q crond || exit 1
+
+# Set working directory
+WORKDIR /backups
+
+# Run as root (needed for cron)
+USER root
+
+# Expose volume for backups
+VOLUME ["/backups", "/var/log"]
+
+# Start the cron service
+ENTRYPOINT ["/entrypoint.sh"]

@@ -4,6 +4,15 @@ const response = require("../utils/response");
 
 const prisma = new PrismaClient();
 
+// Helper function to convert text to title case
+const toTitleCase = (str) => {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 const seedController = {
   async truncateAndSeed(req, res) {
     try {
@@ -32,15 +41,19 @@ const seedController = {
       });
 
       // ===== SEED CATEGORIES =====
-      const categories = [
-        { name: "kementrian komunikasi dan digital" },
-        { name: "kementrian keuangan" },
-        { name: "sekretaris jenderal DPR" },
-        { name: "kementrian ketenagakerjaan" },
-        { name: "badan gizi nasional" },
-        { name: "televisi republik indonesia" },
-        { name: "radio republik indonesia" },
+      const categoriesRaw = [
+        "kementrian komunikasi dan digital",
+        "kementrian keuangan",
+        "sekretaris jenderal DPR",
+        "kementrian ketenagakerjaan",
+        "badan gizi nasional",
+        "televisi republik indonesia",
+        "radio republik indonesia",
       ];
+
+      const categories = categoriesRaw.map(name => ({
+        name: toTitleCase(name.trim())
+      }));
 
       const createdCategories = await prisma.kategori.createMany({
         data: categories,
@@ -81,52 +94,52 @@ const seedController = {
       const regularUsers = [
         {
           username: "komdigi",
-          name_mentri: "kementrian komunikasi dan digital",
+          name_mentri: "Kementrian Komunikasi Dan Digital",
           password: await bcrypt.hash("komdigi123", 10),
           role_id: userRoleId,
-          category_id: categoryMap["kementrian komunikasi dan digital"],
+          category_id: categoryMap["Kementrian Komunikasi Dan Digital"],
         },
         {
           username: "kemenkeu",
-          name_mentri: "kementrian keuangan",
+          name_mentri: "Kementrian Keuangan",
           password: await bcrypt.hash("kemenkeu123", 10),
           role_id: userRoleId,
-          category_id: categoryMap["kementrian keuangan"],
+          category_id: categoryMap["Kementrian Keuangan"],
         },
         {
           username: "setjendpr",
-          name_mentri: "sekretaris jenderal DPR",
+          name_mentri: "Sekretaris Jenderal Dpr",
           password: await bcrypt.hash("setjendpr123", 10),
           role_id: userRoleId,
-          category_id: categoryMap["sekretaris jenderal DPR"],
+          category_id: categoryMap["Sekretaris Jenderal Dpr"],
         },
         {
           username: "kemnaker",
-          name_mentri: "kementrian ketenagakerjaan",
+          name_mentri: "Kementrian Ketenagakerjaan",
           password: await bcrypt.hash("kemnaker123", 10),
           role_id: userRoleId,
-          category_id: categoryMap["kementrian ketenagakerjaan"],
+          category_id: categoryMap["Kementrian Ketenagakerjaan"],
         },
         {
           username: "bgn",
-          name_mentri: "badan gizi nasional",
+          name_mentri: "Badan Gizi Nasional",
           password: await bcrypt.hash("bgn123", 10),
           role_id: userRoleId,
-          category_id: categoryMap["badan gizi nasional"],
+          category_id: categoryMap["Badan Gizi Nasional"],
         },
         {
           username: "lpptvri",
-          name_mentri: "televisi republik indonesia",
+          name_mentri: "Televisi Republik Indonesia",
           password: await bcrypt.hash("lpptvri123", 10),
           role_id: userRoleId,
-          category_id: categoryMap["televisi republik indonesia"],
+          category_id: categoryMap["Televisi Republik Indonesia"],
         },
         {
           username: "lpprri",
-          name_mentri: "radio republik indonesia",
+          name_mentri: "Radio Republik Indonesia",
           password: await bcrypt.hash("lpprri123", 10),
           role_id: userRoleId,
-          category_id: categoryMap["radio republik indonesia"],
+          category_id: categoryMap["Radio Republik Indonesia"],
         },
       ];
 
