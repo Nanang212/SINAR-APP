@@ -35,51 +35,100 @@ async function main() {
   // Regular users
   const regularUsers = [
     {
-      username: 'komdigi',
+      username: 'Komdigi-1',
       name_mentri: 'kementrian komunikasi dan digital',
-      password: await bcrypt.hash('komdigi123', 10),
+      password: await bcrypt.hash('Hu8aj72HG', 10),
       role_id: userRole.id,
       category_id: categoryMap['kementrian komunikasi dan digital']
     },
     {
-      username: 'kemenkeu',
+      username: 'Komdigi-2',
+      name_mentri: 'kementrian komunikasi dan digital',
+      password: await bcrypt.hash('Hu9bf72WM', 10),
+      role_id: userRole.id,
+      category_id: categoryMap['kementrian komunikasi dan digital']
+    },
+    {
+      username: 'Kemenkeu-1',
       name_mentri: 'kementrian keuangan',
-      password: await bcrypt.hash('kemenkeu123', 10),
+      password: await bcrypt.hash('Mq7afPP02', 10),
       role_id: userRole.id,
       category_id: categoryMap['kementrian keuangan']
     },
     {
-      username: 'setjendpr',
+      username: 'Kemenkeu-2',
+      name_mentri: 'kementrian keuangan',
+      password: await bcrypt.hash('Mq6ajF2sP', 10),
+      role_id: userRole.id,
+      category_id: categoryMap['kementrian keuangan']
+    },
+    {
+      username: 'Setjendpr-1',
       name_mentri: 'sekretaris jenderal DPR',
-      password: await bcrypt.hash('setjendpr123', 10),
+      password: await bcrypt.hash('kT8bR6aQ1', 10),
       role_id: userRole.id,
       category_id: categoryMap['sekretaris jenderal DPR']
     },
     {
-      username: 'kemnaker',
+      username: 'Setjendpr-2',
+      name_mentri: 'sekretaris jenderal DPR',
+      password: await bcrypt.hash('G9tP4eLm7', 10),
+      role_id: userRole.id,
+      category_id: categoryMap['sekretaris jenderal DPR']
+    },
+    {
+      username: 'Kemnaker-1',
       name_mentri: 'kementrian ketenagakerjaan',
-      password: await bcrypt.hash('kemnaker123', 10),
+      password: await bcrypt.hash('d3Vq6NfX2', 10),
       role_id: userRole.id,
       category_id: categoryMap['kementrian ketenagakerjaan']
     },
     {
-      username: 'bgn',
+      username: 'Kemnaker-2',
+      name_mentri: 'kementrian ketenagakerjaan',
+      password: await bcrypt.hash('M1yR8zQw5', 10),
+      role_id: userRole.id,
+      category_id: categoryMap['kementrian ketenagakerjaan']
+    },
+    {
+      username: 'Userbgn-1',
       name_mentri: 'badan gizi nasional',
-      password: await bcrypt.hash('bgn123', 10),
+      password: await bcrypt.hash('s5Kc9JtU4', 10),
       role_id: userRole.id,
       category_id: categoryMap['badan gizi nasional']
     },
     {
-      username: 'lpptvri',
+      username: 'Userbgn-2',
+      name_mentri: 'badan gizi nasional',
+      password: await bcrypt.hash('Q2nW7hBp6', 10),
+      role_id: userRole.id,
+      category_id: categoryMap['badan gizi nasional']
+    },
+    {
+      username: 'Lpptvri-1',
       name_mentri: 'televisi republik indonesia',
-      password: await bcrypt.hash('lpptvri123', 10),
+      password: await bcrypt.hash('x8Dk1ZrF3', 10),
       role_id: userRole.id,
       category_id: categoryMap['televisi republik indonesia']
     },
     {
-      username: 'lpprri',
+      username: 'Lpptvri-2',
+      name_mentri: 'televisi republik indonesia',
+      password: await bcrypt.hash('H4uM9yTq2', 10),
+      role_id: userRole.id,
+      category_id: categoryMap['televisi republik indonesia']
+    },
+    {
+      username: 'Lpprri-1',
       name_mentri: 'radio republik indonesia',
-      password: await bcrypt.hash('lpprri123', 10),
+      password: await bcrypt.hash('a6Rj3GvP7', 10),
+      role_id: userRole.id,
+      category_id: categoryMap['radio republik indonesia']
+    },
+    {
+      username: 'Lpprri-2',
+      name_mentri: 'radio republik indonesia',
+      password: await bcrypt.hash('L7cQ2zXk5', 10),
       role_id: userRole.id,
       category_id: categoryMap['radio republik indonesia']
     }
