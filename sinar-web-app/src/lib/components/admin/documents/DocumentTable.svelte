@@ -18,6 +18,7 @@
     original_name: string;
     url: string;
     is_downloaded: boolean;
+    is_report: boolean;
     uploaded_at: string;
     username_upload: string;
     remark: string | null;
@@ -65,6 +66,7 @@
           apiDoc.original_name || apiDoc.filename || "Unknown file",
         url: apiDoc.url || "",
         is_downloaded: apiDoc.is_downloaded || false,
+        is_report: apiDoc.is_report || false,
         uploaded_at: apiDoc.uploaded_at,
         username_upload: apiDoc.username_upload || "Unknown",
         remark: apiDoc.remark,
@@ -79,6 +81,7 @@
         original_name: "unknown",
         url: "",
         is_downloaded: false,
+        is_report: false,
         uploaded_at: new Date().toISOString(),
         username_upload: "Unknown",
         remark: null,
@@ -495,7 +498,7 @@
   }
 </script>
 
-<div class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-6 sm:pt-10">
+<div class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-4 sm:pt-6 md:pt-8 lg:pt-10 xl:pt-12">
 
   <!-- Loading State -->
   {#if isLoading}
@@ -647,11 +650,11 @@
         </table>
         
         <!-- Mobile/Tablet Card Layout (visible on mobile/tablet) -->
-        <div class="lg:hidden space-y-4 mt-6">
+        <div class="lg:hidden space-y-8 sm:space-y-8 md:space-y-10 mt-20 sm:mt-12 md:mt-14">
           {#each documents as doc (doc.id)}
-            <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick={() => handleRowClick(doc)}>
+            <div class="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 md:p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick={() => handleRowClick(doc)}>
               <!-- Document Header -->
-              <div class="flex items-start space-x-3 mb-3">
+              <div class="flex items-start space-x-3 mb-3 sm:mb-4">
                 <svg class="h-8 w-8 {doc.iconColor} mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 2v10H4V5h12z" clip-rule="evenodd" />
                   <path d="M6 7h8v1H6V7zM6 9h8v1H6V9zM6 11h6v1H6v-1zM6 13h4v1H6v-1z" />
@@ -700,7 +703,7 @@
               </div>
               
               <!-- Document Info -->
-              <div class="grid grid-cols-2 gap-3 text-xs text-gray-600">
+              <div class="grid grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
                 <div>
                   <span class="font-medium">Uploaded by:</span> {doc.username_upload}
                 </div>
@@ -709,12 +712,15 @@
                 </div>
                 <div>
                   <span class="font-medium">Status:</span>
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {doc.isReport ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                    {doc.isReport ? 'Reported' : 'Not Reported'}
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {doc.is_report ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                    {doc.is_report ? 'Reported' : 'Not Reported'}
                   </span>
                 </div>
                 <div>
-                  <span class="font-medium">Downloads:</span> {doc.downloadCount}
+                  <span class="font-medium">Downloads:</span>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {doc.is_downloaded ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                    {doc.is_downloaded ? 'Downloaded' : 'Not Downloaded'}
+                  </span>
                 </div>
               </div>
             </div>

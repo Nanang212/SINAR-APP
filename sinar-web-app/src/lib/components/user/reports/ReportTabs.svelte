@@ -262,31 +262,11 @@
   <!-- Search + Filters (only when browse) -->
   {#if activeTab === "browse"}
     <div
-      class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 md:gap-3 w-full sm:w-auto sm:ml-auto"
+      class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-2 md:gap-3 w-full sm:w-auto sm:ml-auto"
     >
-      <!-- ✅ MOBILE: Date range + Sort + Search + Refresh stacked -->
-      <div class="flex sm:hidden items-center gap-2 w-full mt-2">
-        <!-- Date range (mobile) -->
-        <div class="relative flex-1">
-          <input
-            type="text"
-            readonly
-            value={getDateRangeDisplay()}
-            placeholder="Filter by date"
-            onclick={openDateRangePicker}
-            class="w-full px-3 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-          />
-          <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </div>
-      </div>
 
       <!-- Desktop: Sort Toggle Button -->
-      <div class="hidden sm:block relative group">
+      <div class="hidden sm:block relative group flex-shrink-0">
         <button
           onclick={handleSortToggle}
           class="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200 border border-gray-300 hover:border-gray-400 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 min-w-[100px]"
@@ -343,7 +323,7 @@
       </div>
 
       <!-- ✅ DESKTOP: Date range group (di kanan tombol Sort) -->
-      <div class="hidden sm:flex items-center gap-2">
+      <div class="hidden sm:flex items-center gap-2 flex-shrink-0">
         <div class="relative">
           <input
             type="text"
@@ -351,7 +331,7 @@
             value={getDateRangeDisplay()}
             placeholder="Filter by date"
             onclick={openDateRangePicker}
-            class="w-48 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+            class="w-32 sm:w-36 md:w-40 lg:w-48 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
           />
           <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -363,11 +343,11 @@
       </div>
 
       <!-- Desktop Search Bar -->
-      <div class="hidden sm:block relative flex-1 sm:flex-none">
+      <div class="hidden sm:block relative flex-1 sm:flex-none min-w-0">
         <input
           type="text"
           placeholder="Search reports..."
-          class="w-full sm:w-48 md:w-56 lg:w-64 xl:w-80 2xl:w-96 pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          class="w-full sm:w-32 md:w-40 lg:w-48 xl:w-56 2xl:w-64 pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[100px]"
           value={searchTerm}
           oninput={handleSearchInput}
         />
@@ -391,12 +371,12 @@
       </div>
 
       <!-- Mobile: Search + Sort + Refresh Row -->
-      <div class="flex sm:hidden items-center gap-2 w-full">
+      <div class="flex sm:hidden items-center flex-wrap gap-2 w-full mt-2">
         <!-- Mobile Sort -->
         <div class="relative group flex-shrink-0">
           <button
             onclick={handleSortToggle}
-            class="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-gradient-to-r from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200 border border-gray-300 hover:border-gray-400 rounded-md shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+            class="flex items-center gap-1 px-2 py-2 text-xs font-medium bg-gradient-to-r from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200 border border-gray-300 hover:border-gray-400 rounded-md shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 min-w-0"
             title={sortOrder === "desc"
               ? "Currently showing newest first"
               : "Currently showing oldest first"}
@@ -417,14 +397,14 @@
                 d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
               />
             </svg>
-            <span class="text-gray-700 font-semibold text-xs"
+            <span class="text-gray-700 font-semibold text-xs hidden xs:inline-block truncate"
               >{sortOrder === "desc" ? "New" : "Old"}</span
             >
           </button>
         </div>
 
         <!-- Mobile Search -->
-        <div class="relative flex-1">
+        <div class="relative flex-1 min-w-[120px]">
           <input
             type="text"
             placeholder="Search..."
@@ -472,8 +452,28 @@
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            <span class="text-xs">Refresh</span>
+            <span class="text-xs hidden xs:inline-block truncate">Refresh</span>
           </button>
+        </div>
+      </div>
+
+      <!-- Mobile: Date Range Filter -->
+      <div class="flex sm:hidden items-center gap-2 w-full mt-1">
+        <div class="relative flex-1">
+          <input
+            type="text"
+            readonly
+            value={getDateRangeDisplay()}
+            placeholder="Filter by date"
+            onclick={openDateRangePicker}
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+          />
+          <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
         </div>
       </div>
 

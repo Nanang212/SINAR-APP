@@ -4,6 +4,9 @@ export default {
   content: ['./src/**/*.{html,js,svelte,ts}'],
   theme: {
     extend: {
+      screens: {
+        'xs': '475px',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

@@ -153,7 +153,7 @@
     value={getDateRangeDisplay()}
     placeholder={placeholder}
     onclick={openDateRangePicker}
-    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer min-w-0"
   />
   <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>

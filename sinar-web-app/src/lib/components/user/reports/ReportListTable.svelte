@@ -391,7 +391,7 @@
 </script>
 
 <div
-  class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-6 sm:pt-10"
+  class="h-full flex flex-col pl-2 sm:pl-4 lg:pl-6 pr-2 sm:pr-4 lg:pr-8 pb-4 sm:pb-6 pt-4 sm:pt-6 md:pt-8 lg:pt-10 xl:pt-12"
 >
   <!-- Loading State -->
   {#if isLoading}
@@ -528,7 +528,7 @@
       </table>
       
       <!-- Mobile/Tablet Card Layout (visible on mobile/tablet) -->
-      <div class="lg:hidden space-y-4">
+      <div class="lg:hidden space-y-5 sm:space-y-6 md:space-y-8 mt-8 sm:mt-10 md:mt-12">
         {#if paginatedData().length === 0 && !isLoading}
           <!-- Empty State -->
           <div class="flex flex-col items-center justify-center py-16">

@@ -94,9 +94,9 @@
           <!-- Navigation and Search -->
           <div class="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-4">
             <!-- Search Bar, Sort and Refresh Button - moved to right -->
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto ml-auto">
-              <!-- Mobile: Search + Sort Row -->
-              <div class="flex sm:hidden items-center gap-2 w-full">
+            <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto ml-auto">
+              <!-- Mobile/Tablet: Search + Sort Row -->
+              <div class="flex lg:hidden items-center flex-wrap gap-2 w-full">
                 <!-- Mobile Sort Toggle Button (Compact) -->
                 <div class="relative group flex-shrink-0">
                   <button
@@ -138,8 +138,8 @@
                 </div>
               </div>
 
-              <!-- Mobile: Date Range Filter -->
-              <div class="flex sm:hidden items-center gap-2 w-full mt-2">
+              <!-- Mobile/Tablet: Date Range Filter -->
+              <div class="flex lg:hidden items-center gap-2 w-full mt-1">
                 <DateRangePicker
                   startDate={startDate}
                   endDate={endDate}
@@ -150,7 +150,7 @@
               </div>
 
               <!-- Desktop: Sort Toggle Button -->
-              <div class="hidden sm:block relative group">
+              <div class="hidden lg:block relative group flex-shrink-0">
                 <button
                   onclick={handleSortToggle}
                   class="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200 border border-gray-300 hover:border-gray-400 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 min-w-[100px]"
@@ -193,7 +193,7 @@
               </div>
 
               <!-- Desktop: Date Range Filter -->
-              <div class="hidden sm:flex items-center gap-2">
+              <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
                 <DateRangePicker
                   startDate={startDate}
                   endDate={endDate}
@@ -204,11 +204,11 @@
               </div>
 
               <!-- Desktop Search Bar -->
-              <div class="hidden sm:block relative flex-1 sm:flex-none">
+              <div class="hidden lg:block relative flex-1 lg:flex-none min-w-0">
                 <input
                   type="text"
                   placeholder="Search documents..."
-                  class="w-full sm:w-64 md:w-80 lg:w-96 pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  class="w-full lg:w-48 xl:w-64 2xl:w-80 pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[120px]"
                   value={searchTerm}
                   oninput={(e) => handleSearch(e.currentTarget.value)}
                 />
@@ -256,7 +256,7 @@
       </div>
       
       <!-- Document Table Content -->
-      <div class="absolute inset-0 pt-[120px] sm:pt-[100px]">
+      <div class="absolute inset-0 pt-[200px] xs:pt-[180px] sm:pt-[180px] md:pt-[200px] lg:pt-[180px] xl:pt-[200px] 2xl:pt-[100px]">
         <DocumentListTable 
           bind:this={documentTableRef}
           fetchOnMount={true}

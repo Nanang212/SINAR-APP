@@ -116,8 +116,8 @@
       <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 z-10 rounded-t-lg"></div>
       
       <!-- Fixed Header and Tabs -->
-      <div class="absolute top-1 left-0 right-0 bg-white z-20 border-b border-gray-200 shadow-sm">
-        <div class="px-6 pt-5 pb-4">
+      <div class="absolute top-1 left-0 right-0 bg-white z-20 border-b border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-2 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-5 pb-3 sm:pb-4 w-full">
           <DocumentTabs 
             {activeTab} 
             onTabChange={handleTabChange}
@@ -135,7 +135,7 @@
       </div>
       
       <!-- Tab Content -->
-      <div class="absolute inset-0 pt-[100px] sm:pt-[110px] {activeTab === 'input' ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}">
+      <div class="absolute inset-0 pt-[160px] xs:pt-[150px] sm:pt-[140px] md:pt-[150px] lg:pt-[150px] xl:pt-[150px] 2xl:pt-[130px] overflow-y-auto overflow-x-hidden">
         {#if activeTab === "input"}
           <DocumentForm onSubmit={handleFormSubmit} onReset={handleFormReset} documentData={selectedDocument} />
         {:else if activeTab === "browse"}

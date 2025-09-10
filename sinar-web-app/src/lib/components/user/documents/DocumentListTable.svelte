@@ -835,7 +835,7 @@
                   >
                     <!-- Report Detail Button -->
                     <button
-                      onclick={() => handleReportDetail(doc)}
+                      onclick={() => handleDetail(doc)}
                       class="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
                       aria-label="View report details"
                     >
