@@ -645,7 +645,7 @@
                         </div>
                         {#if doc.remark}
                           <div
-                            class="text-xs text-gray-400 mt-1 break-words"
+                            class="text-xs text-gray-400 mt-1 line-clamp-2"
                             title={doc.remark}
                           >
                             {doc.remark}
@@ -821,7 +821,7 @@
                     </p>
                     {#if doc.remark}
                       <p
-                        class="text-xs text-gray-400 break-words mt-1"
+                        class="text-xs text-gray-400 mt-1 line-clamp-2"
                         title={doc.remark}
                       >
                         {doc.remark}

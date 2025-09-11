@@ -473,7 +473,7 @@
             <td class="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-r border-gray-200">
               <div class="text-sm text-gray-900">
                 {#if document.description && document.description !== '-'}
-                  <span class="break-words" title={document.description}>{document.description}</span>
+                  <span class="line-clamp-2" title={document.description}>{document.description}</span>
                 {:else}
                   <span class="text-gray-400 italic">No description</span>
                 {/if}
@@ -572,7 +572,7 @@
               <!-- Description -->
               {#if document.description && document.description !== '-'}
                 <div class="mb-3">
-                  <p class="text-sm text-gray-700 break-words">{document.description}</p>
+                  <p class="text-sm text-gray-700 line-clamp-2" title={document.description}>{document.description}</p>
                 </div>
               {/if}
               

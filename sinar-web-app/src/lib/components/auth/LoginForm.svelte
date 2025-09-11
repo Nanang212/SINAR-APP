@@ -59,13 +59,13 @@
 </script>
 
 <div
-  class="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] h-[90vh] sm:h-[85vh] md:h-[80vh] lg:h-[75vh]"
+  class="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] min-h-[90vh] sm:min-h-[85vh] md:min-h-[80vh] lg:min-h-[75vh] max-h-[95vh]"
 >
   <!-- Light Theme Card Container -->
   <div class="relative h-full">
     <!-- Clean White Card with Soft Shadow -->
     <div
-      class="relative bg-white rounded-3xl px-4 py-6 sm:px-8 sm:py-8 md:px-12 md:py-10 lg:px-16 lg:py-12 overflow-hidden h-full shadow-xl"
+      class="relative bg-white rounded-3xl px-4 py-6 sm:px-8 sm:py-8 md:px-12 md:py-10 lg:px-16 lg:py-12 overflow-y-auto overflow-x-hidden h-full shadow-xl"
       style="box-shadow: 0 25px 50px rgba(59, 130, 246, 0.15), 0 15px 35px rgba(99, 102, 241, 0.08);"
     >
       <!-- Subtle top accent -->
@@ -77,21 +77,21 @@
 
       <!-- Split Content: Responsive Layout -->
       <div
-        class="flex flex-col lg:flex-row items-center relative z-10 h-full gap-4 lg:gap-0"
+        class="flex flex-col xl:flex-row items-center relative z-10 min-h-full gap-4 xl:gap-0"
       >
         <!-- Logo Section -->
         <div
-          class="flex-1 lg:flex-[6] flex items-center justify-center px-4 py-4 md:px-8 md:py-8 lg:px-16 lg:py-12"
+          class="flex-1 xl:flex-[6] flex items-center justify-center px-4 py-4 md:px-8 md:py-8 xl:px-16 xl:py-12"
         >
           <div class="text-center relative">
             <img
               src="/assets/logo.png"
               alt="SINAR Logo"
-              class="w-32 h-32 sm:w-48 sm:h-48 md:w-64 md:h-64 lg:w-80 lg:h-80 mx-auto mb-2 lg:mb-4 opacity-90 relative z-10"
+              class="w-32 h-32 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 xl:w-80 xl:h-80 mx-auto mb-2 xl:mb-4 opacity-90 relative z-10"
             />
             <!-- Shiny effect overlay for sun part -->
             <div
-              class="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 pointer-events-none"
+              class="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-40 xl:h-40 pointer-events-none"
               style="
                 background: radial-gradient(circle, rgba(255, 193, 7, 0.3) 0%, rgba(255, 235, 59, 0.2) 30%, transparent 70%);
                 border-radius: 50%;
@@ -104,12 +104,12 @@
 
         <!-- Login Form Section -->
         <div
-          class="flex-1 lg:flex-[4] w-full lg:min-w-80 p-4 lg:p-8 h-auto lg:h-full flex flex-col justify-center"
+          class="flex-1 xl:flex-[4] w-full xl:min-w-80 p-4 lg:p-6 xl:p-8 h-auto flex flex-col justify-center"
         >
           <!-- Header Inside Card -->
-          <div class="mb-6 lg:mb-8">
+          <div class="mb-4 sm:mb-6 xl:mb-8">
             <h1
-              class="text-2xl sm:text-3xl font-bold mb-2 lg:mb-3 tracking-tight text-gray-800"
+              class="text-xl sm:text-2xl xl:text-3xl font-bold mb-2 xl:mb-3 tracking-tight text-gray-800"
             >
               Welcome back
             </h1>
@@ -128,7 +128,7 @@
           {/if}
 
           <!-- Login Form -->
-          <form onsubmit={handleSubmit} class="space-y-6 lg:space-y-8">
+          <form onsubmit={handleSubmit} class="space-y-4 sm:space-y-6 xl:space-y-8">
             <!-- Username Field -->
             <div>
               <label

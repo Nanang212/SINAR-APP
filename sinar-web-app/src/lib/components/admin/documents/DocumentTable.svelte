@@ -568,8 +568,8 @@
                         {doc.username_upload} • {formatDate(doc.uploaded_at).split(' ')[0]}
                       </div>
                       {#if doc.remark}
-                        <div class="text-xs text-gray-400 mt-1 truncate" title={doc.remark}>
-                          {doc.remark.length > 80 ? doc.remark.substring(0, 80) + '...' : doc.remark}
+                        <div class="text-xs text-gray-400 mt-1 line-clamp-2" title={doc.remark}>
+                          {doc.remark}
                         </div>
                       {/if}
                     </div>
@@ -723,6 +723,14 @@
                   </span>
                 </div>
               </div>
+              
+              <!-- Remark Section -->
+              {#if doc.remark}
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                  <span class="font-medium text-xs text-gray-700">Remark:</span>
+                  <p class="text-xs text-gray-600 mt-1 line-clamp-2">{doc.remark}</p>
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
